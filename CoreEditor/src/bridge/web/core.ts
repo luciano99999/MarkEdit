@@ -5,12 +5,12 @@ import {
   ReadableContentPair,
   ReplaceGranularity,
   resetEditor,
-  clearEditor,
   getEditorState,
   getEditorText,
   getReadableContentPair,
   insertText,
   replaceText,
+  performTextDrop,
   handleFocusLost,
   handleMouseExited,
   setHasModalSheet,
@@ -22,25 +22,21 @@ import {
  * @overrideModuleName WebBridgeCore
  */
 export interface WebModuleCore extends WebModule {
-  resetEditor({ text, selectionRange }: { text: string; selectionRange?: SelectionRange }): void;
-  clearEditor(): void;
+  resetEditor({ text, selectionRange, documentChanged }: { text: string; selectionRange?: SelectionRange; documentChanged: boolean }): Promise<boolean>;
   getEditorState(): { hasFocus: boolean; hasSelection: boolean };
   getEditorText(): string;
   getReadableContentPair(): ReadableContentPair;
   insertText({ text, from, to }: { text: string; from: CodeGen_Int; to: CodeGen_Int }): void;
   replaceText({ text, granularity }: { text: string; granularity: ReplaceGranularity }): void;
+  performTextDrop({ text }: { text: string }): void;
   handleFocusLost(): void;
   handleMouseExited({ clientX, clientY }: { clientX: number; clientY: number }): void;
   setHasModalSheet({ value }: { value: boolean }): void;
 }
 
 export class WebModuleCoreImpl implements WebModuleCore {
-  resetEditor({ text, selectionRange }: { text: string; selectionRange?: SelectionRange }): void {
-    resetEditor(text, selectionRange);
-  }
-
-  clearEditor(): void {
-    clearEditor();
+  resetEditor({ text, selectionRange, documentChanged }: { text: string; selectionRange?: SelectionRange; documentChanged: boolean }): Promise<boolean> {
+    return resetEditor(text, selectionRange, documentChanged);
   }
 
   getEditorState(): { hasFocus: boolean; hasSelection: boolean } {
@@ -61,6 +57,10 @@ export class WebModuleCoreImpl implements WebModuleCore {
 
   replaceText({ text, granularity }: { text: string; granularity: ReplaceGranularity }): void {
     replaceText(text, granularity);
+  }
+
+  performTextDrop({ text }: { text: string }): void {
+    performTextDrop(text);
   }
 
   handleFocusLost(): void {

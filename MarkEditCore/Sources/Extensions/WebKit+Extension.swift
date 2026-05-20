@@ -1,13 +1,22 @@
 //
-//  WKWebViewConfiguration+Extension.swift
+//  WebKit+Extension.swift
 //
 //  Created by cyan on 3/29/26.
 //
 
 import WebKit
 
+public extension WKWebView {
+  /// Keep rendering and timers active when the window is occluded by other windows.
+  func disableWindowOcclusionDetection() {
+    if !setBoolValue(false, forSelector: "_setWindowOcclusionDetectionEnabled:") {
+      assertionFailure("Failed to call _setWindowOcclusionDetectionEnabled:")
+    }
+  }
+}
+
 public extension WKWebViewConfiguration {
-  func enablePerformanceFlags() {
+  func enablePerformanceFlags(disabledFeatures: [String] = []) {
     // Launch the WebContent process at init time instead of deferring it to the first load.
     //
     // On macOS the default is to delay process launch until loadHTMLString is called,
@@ -44,13 +53,14 @@ public extension WKWebViewConfiguration {
 
     // Disable features with eager initialization cost at WebContent process startup
     // that serve no purpose in a local text editor.
-    preferences.disableUnneededFeatures()
+    preferences.disableUnneededFeatures(additionalKeys: disabledFeatures)
   }
 }
 
 // MARK: - WebKitConfigSPI
 
 public protocol WebKitConfigSPI: NSObject {}
+extension WKWebView: WebKitConfigSPI {}
 extension WKWebViewConfiguration: WebKitConfigSPI {}
 extension WKPreferences: WebKitConfigSPI {}
 
@@ -86,7 +96,7 @@ private extension WKPreferences {
     return (selfClass.perform(selector)?.takeUnretainedValue() as? [AnyObject]) ?? []
   }
 
-  func disableUnneededFeatures() {
+  func disableUnneededFeatures(additionalKeys: [String] = []) {
     // -[WKPreferences _setEnabled:forFeature:]
     let selector = sel_getUid(["_setEnabled:", "forFeature:"].joined())
 
@@ -95,7 +105,7 @@ private extension WKPreferences {
       return
     }
 
-    let keysToDisable: Set<String> = [
+    let keysToDisable = Set<String>([
       // Background scripts for PWAs; requires a real HTTP server to register
       "ServiceWorkersEnabled",
       // W3C EME API for DRM-protected media playback
@@ -104,7 +114,7 @@ private extension WKPreferences {
       "LegacyEncryptedMediaAPIEnabled",
       // Cross-context mutex for coordinating shared storage across tabs/workers
       "WebLocksAPIEnabled",
-    ]
+    ]).union(additionalKeys)
 
     let setFeatureEnabled = unsafeBitCast(
       method(for: selector),

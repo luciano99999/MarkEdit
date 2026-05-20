@@ -1,42 +1,8 @@
 import { describe, expect, test, beforeEach } from '@jest/globals';
+import { EditorSelection } from '@codemirror/state';
 import { Config } from '../src/config';
-import { resetEditor } from '../src/core';
+import { performTextDrop, resetEditor } from '../src/core';
 import normalizeSelection from '../src/modules/selection/normalizeSelection';
-
-// Polyfill ResizeObserver for jsdom
-globalThis.ResizeObserver = class {
-  observe() { /* noop */ }
-  unobserve() { /* noop */ }
-  disconnect() { /* noop */ }
-} as unknown as typeof ResizeObserver;
-
-// Polyfill Range.getClientRects for jsdom (CodeMirror uses it for coordsAtPos)
-Range.prototype.getClientRects = function () {
-  return [] as unknown as DOMRectList;
-};
-
-// Polyfill Element.scrollTo for jsdom
-Element.prototype.scrollTo = function () { /* noop */ };
-
-// Polyfill matchMedia for jsdom
-window.matchMedia = () => ({ matches: false, addEventListener() { /* noop */ }, removeEventListener() { /* noop */ } }) as unknown as MediaQueryList;
-
-// Mock MarkEdit global
-(globalThis as Record<string, unknown>).MarkEdit = {
-  editorView: null,
-  editorAPI: { setView() { /* noop */ } },
-};
-
-// Mock native modules
-window.nativeModules = {
-  core: {
-    notifyViewDidUpdate() { /* noop */ },
-    notifyContentOffsetDidChange() { /* noop */ },
-    notifyContentHeightDidChange() { /* noop */ },
-    notifyBackgroundColorDidChange() { /* noop */ },
-    notifyViewportScaleDidChange() { /* noop */ },
-  },
-} as unknown as typeof window.nativeModules;
 
 // Minimal config
 window.config = {
@@ -65,37 +31,37 @@ describe('Selection clamping logic', () => {
   });
 
   test('valid cursor position', () => {
-    const sel = normalizeSelection(doc.length, { anchor: 5, head: 5 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(doc.length, { anchor: 5, head: 5 });
     expect(sel.anchor).toBe(5);
     expect(sel.head).toBe(5);
   });
 
   test('valid selection range', () => {
-    const sel = normalizeSelection(doc.length, { anchor: 0, head: 5 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(doc.length, { anchor: 0, head: 5 });
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(5);
   });
 
   test('anchor and head exceeding length are clamped', () => {
-    const sel = normalizeSelection(doc.length, { anchor: 100, head: 200 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(doc.length, { anchor: 100, head: 200 });
     expect(sel.anchor).toBe(doc.length);
     expect(sel.head).toBe(doc.length);
   });
 
   test('negative values are clamped to 0', () => {
-    const sel = normalizeSelection(doc.length, { anchor: -10, head: -5 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(doc.length, { anchor: -10, head: -5 });
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(0);
   });
 
   test('mixed out-of-bounds values', () => {
-    const sel = normalizeSelection(doc.length, { anchor: -1, head: 100 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(doc.length, { anchor: -1, head: 100 });
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(doc.length);
   });
 
   test('empty document with selection range', () => {
-    const sel = normalizeSelection(0, { anchor: 5, head: 10 } as { anchor: CodeGen_Int; head: CodeGen_Int });
+    const sel = normalizeSelection(0, { anchor: 5, head: 10 });
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(0);
   });
@@ -112,52 +78,189 @@ describe('resetEditor selection', () => {
     document.body.innerHTML = '';
   });
 
-  test('without selection range, cursor is at 0', () => {
-    resetEditor('Hello, World!');
+  test('without selection range, cursor is at 0', async () => {
+    await resetEditor('Hello, World!');
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(0);
   });
 
-  test('with valid selection range', () => {
-    resetEditor('Hello, World!', { anchor: 7 as CodeGen_Int, head: 12 as CodeGen_Int });
+  test('with valid selection range', async () => {
+    await resetEditor('Hello, World!', { anchor: 7, head: 12 });
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(7);
     expect(sel.head).toBe(12);
   });
 
-  test('with cursor position (anchor equals head)', () => {
-    resetEditor('Hello, World!', { anchor: 5 as CodeGen_Int, head: 5 as CodeGen_Int });
+  test('with cursor position (anchor equals head)', async () => {
+    await resetEditor('Hello, World!', { anchor: 5, head: 5 });
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(5);
     expect(sel.head).toBe(5);
   });
 
-  test('selection range exceeding document length is clamped', () => {
+  test('selection range exceeding document length is clamped', async () => {
     const content = 'Short';
-    resetEditor(content, { anchor: 100 as CodeGen_Int, head: 200 as CodeGen_Int });
+    await resetEditor(content, { anchor: 100, head: 200 });
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(content.length);
     expect(sel.head).toBe(content.length);
   });
 
-  test('negative selection range is clamped to 0', () => {
-    resetEditor('Hello', { anchor: -5 as CodeGen_Int, head: -1 as CodeGen_Int });
+  test('negative selection range is clamped to 0', async () => {
+    await resetEditor('Hello', { anchor: -5, head: -1 });
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(0);
   });
 
-  test('empty document with selection range clamps to 0', () => {
-    resetEditor('', { anchor: 10 as CodeGen_Int, head: 20 as CodeGen_Int });
+  test('empty document with selection range clamps to 0', async () => {
+    await resetEditor('', { anchor: 10, head: 20 });
     const sel = window.editor.state.selection.main;
     expect(sel.anchor).toBe(0);
     expect(sel.head).toBe(0);
   });
 
-  test('document content is preserved', () => {
+  test('document content is preserved', async () => {
     const content = 'Hello, MarkEdit!';
-    resetEditor(content, { anchor: 0 as CodeGen_Int, head: 5 as CodeGen_Int });
+    await resetEditor(content, { anchor: 0, head: 5 });
     expect(window.editor.state.doc.toString()).toBe(content);
+  });
+});
+
+describe('performTextDrop', () => {
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (typeof window.editor?.destroy === 'function') {
+      window.editor.destroy();
+    }
+
+    document.body.innerHTML = '';
+  });
+
+  // Inject a fake `.cm-dropCursor` element into the editor's scrollDOM so the lookup
+  // succeeds, and stub `posAtCoords` to return the desired document position (jsdom
+  // doesn't compute layout, so the real method always returns null).
+  function fakeDropCursor(pos: number | null) {
+    const cursor = document.createElement('div');
+    cursor.className = 'cm-dropCursor';
+    window.editor.scrollDOM.appendChild(cursor);
+
+    Object.defineProperty(window.editor, 'posAtCoords', {
+      configurable: true,
+      value: () => pos,
+    });
+  }
+
+  test('inserts text at the drop cursor position', async () => {
+    await resetEditor('Hello, World!');
+    fakeDropCursor(7);
+
+    performTextDrop('there ');
+    expect(window.editor.state.doc.toString()).toBe('Hello, there World!');
+  });
+
+  test('moves the caret to after the inserted text', async () => {
+    await resetEditor('Hello, World!');
+    fakeDropCursor(7);
+
+    performTextDrop('there ');
+    expect(window.editor.state.selection.main.head).toBe(13);
+  });
+
+  test('falls back to replacing the selection when no drop cursor is present', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    performTextDrop('Earth');
+    expect(window.editor.state.doc.toString()).toBe('Hello, Earth!');
+  });
+
+  test('falls back when posAtCoords returns null', async () => {
+    await resetEditor('Hello, World!');
+    fakeDropCursor(null);
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    performTextDrop('Earth');
+    expect(window.editor.state.doc.toString()).toBe('Hello, Earth!');
+  });
+});
+
+describe('resetEditor documentChanged', () => {
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (typeof window.editor?.destroy === 'function') {
+      window.editor.destroy();
+    }
+
+    document.body.innerHTML = '';
+  });
+
+  test('same-document reset preserves the live selection', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    await resetEditor('Hello, World!', undefined, false);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(7);
+    expect(sel.head).toBe(12);
+  });
+
+  test('same-document reset preserves the live selection across content changes', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(3, 8) });
+
+    await resetEditor('Hello, MarkEdit!', undefined, false);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(3);
+    expect(sel.head).toBe(8);
+  });
+
+  test('same-document reset with zero live caret stays at 0', async () => {
+    await resetEditor('Hello');
+    await resetEditor('World', undefined, false);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(0);
+    expect(sel.head).toBe(0);
+  });
+
+  test('same-document reset overrides caller-provided selectionRange with the live caret', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(3, 8) });
+
+    await resetEditor('Hello, World!', { anchor: 0, head: 0 }, false);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(3);
+    expect(sel.head).toBe(8);
+  });
+
+  test('documentChanged=true ignores the live caret and uses provided range', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    await resetEditor('Other content', { anchor: 2, head: 4 }, true);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(2);
+    expect(sel.head).toBe(4);
+  });
+
+  test('documentChanged=true with no range defaults to 0 regardless of prior caret', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    await resetEditor('New doc', undefined, true);
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(0);
+    expect(sel.head).toBe(0);
+  });
+
+  test('documentChanged defaults to true', async () => {
+    await resetEditor('Hello, World!');
+    window.editor.dispatch({ selection: EditorSelection.range(7, 12) });
+
+    await resetEditor('Hello, World!');
+    const sel = window.editor.state.selection.main;
+    expect(sel.anchor).toBe(0);
+    expect(sel.head).toBe(0);
   });
 });

@@ -18,22 +18,24 @@ public final class WebBridgeCore {
     self.webView = webView
   }
 
-  public func resetEditor(text: String, selectionRange: SelectionRange?, completion: ((Result<Void, WKWebView.InvokeError>) -> Void)? = nil) {
+  public func resetEditor(text: String, selectionRange: SelectionRange?, documentChanged: Bool) async throws -> Bool {
     struct Message: Encodable {
       let text: String
       let selectionRange: SelectionRange?
+      let documentChanged: Bool
     }
 
     let message = Message(
       text: text,
-      selectionRange: selectionRange
+      selectionRange: selectionRange,
+      documentChanged: documentChanged
     )
 
-    webView?.invoke(path: "webModules.core.resetEditor", message: message, completion: completion)
-  }
+    guard let webView else {
+      throw WKWebView.InvokeError.unexpectedNil
+    }
 
-  public func clearEditor(completion: ((Result<Void, WKWebView.InvokeError>) -> Void)? = nil) {
-    webView?.invoke(path: "webModules.core.clearEditor", completion: completion)
+    return try await webView.invoke(path: "webModules.core.resetEditor", message: message, callAsync: true)
   }
 
   public func getEditorState() async throws -> WebBridgeCoreGetEditorStateReturnType {
@@ -88,6 +90,18 @@ public final class WebBridgeCore {
     )
 
     webView?.invoke(path: "webModules.core.replaceText", message: message, completion: completion)
+  }
+
+  public func performTextDrop(text: String, completion: ((Result<Void, WKWebView.InvokeError>) -> Void)? = nil) {
+    struct Message: Encodable {
+      let text: String
+    }
+
+    let message = Message(
+      text: text
+    )
+
+    webView?.invoke(path: "webModules.core.performTextDrop", message: message, completion: completion)
   }
 
   public func handleFocusLost(completion: ((Result<Void, WKWebView.InvokeError>) -> Void)? = nil) {

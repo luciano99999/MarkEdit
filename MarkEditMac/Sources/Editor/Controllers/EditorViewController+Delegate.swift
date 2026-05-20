@@ -9,6 +9,7 @@ import AppKit
 import WebKit
 import MarkEditCore
 import MarkEditKit
+import FileDrop
 
 // MARK: - WKUIDelegate
 
@@ -72,6 +73,35 @@ extension EditorViewController: EditorWebViewActionDelegate {
       findSelection(self)
     case .selectAllOccurrences:
       selectAllOccurrences()
+    }
+  }
+
+  func editorWebView(_ webView: EditorWebView, didDrop fileURLs: [URL]) {
+    let lineBreak = document?.stringValue.getLineBreak(
+      defaultValue: AppPreferences.General.defaultLineEndings.characters
+    ) ?? "\n"
+
+    let textToDrop: String? = {
+      // Shift-drop inlines text file contents; otherwise files become links.
+      // Single pass preserves the original drop order across the inline/link mix.
+      let preferInline = NSApp.shiftKeyIsPressed
+      let parts: [String] = fileURLs.map { fileURL in
+        if preferInline, !fileURL.isBinaryFile, let text = (try? Data(contentsOf: fileURL))?.toString() {
+          return text
+        }
+
+        return FileDropHandler.handle(
+          fileURL: fileURL,
+          documentURL: document?.fileURL,
+          documentType: document?.fileType
+        )
+      }
+
+      return parts.isEmpty ? nil : parts.joined(separator: lineBreak)
+    }()
+
+    if let textToDrop {
+      bridge.core.performTextDrop(text: textToDrop)
     }
   }
 
@@ -230,8 +260,15 @@ extension EditorViewController: EditorModuleCoreDelegate {
         return (url, false)
       }
 
-      // Fallback to local files, e.g., file:///Users/cyan/...
-      return (document?.baseURL?.appending(path: link.removingPercentEncoding ?? link), true)
+      let path = link.removingPercentEncoding ?? link
+
+      // Absolute POSIX path, e.g. /Users/cyan/foo.png from an untitled-doc drop.
+      if path.hasPrefix("/") {
+        return (URL(filePath: path), true)
+      }
+
+      // Fallback to local files relative to the document, e.g., file:///Users/cyan/...
+      return (document?.baseURL?.appending(path: path), true)
     }()
 
     // Open or reveal the url
@@ -312,16 +349,22 @@ extension EditorViewController: EditorModulePreviewDelegate {
 // MARK: - EditorModuleAPIDelegate
 
 extension EditorViewController: EditorModuleAPIDelegate {
-  func editorAPIOpenFile(_ sender: EditorModuleAPI, fileURL: URL) -> Bool {
-    NSWorkspace.shared.openOrReveal(url: fileURL)
-  }
-
-  func editorAPIGetFileURL(_ sender: EditorModuleAPI, path: String?) -> URL? {
-    guard let path else {
-      return document?.fileURL
+  func editorAPISaveDocument(_ sender: EditorModuleAPI) async -> Bool {
+    guard let document else {
+      return false
     }
 
-    return URL(filePath: path)
+    await document.waitUntilSaveCompleted(userInitiated: true)
+    return true
+  }
+
+  func editorAPICloseDocument(_ sender: EditorModuleAPI) -> Bool {
+    guard let document else {
+      return false
+    }
+
+    document.close()
+    return true
   }
 
   func editorAPI(_ sender: EditorModuleAPI, addMainMenuItems items: [(String, WebMenuItem)]) {
@@ -358,6 +401,18 @@ extension EditorViewController: EditorModuleAPIDelegate {
     let result = NSPerformService(name, pboard)
     try? await Task.sleep(for: .seconds(0.5))
     return result
+  }
+
+  func editorAPIOpenFile(_ sender: EditorModuleAPI, fileURL: URL) -> Bool {
+    NSWorkspace.shared.openOrReveal(url: fileURL)
+  }
+
+  func editorAPIGetFileURL(_ sender: EditorModuleAPI, path: String?) -> URL? {
+    guard let path else {
+      return document?.fileURL
+    }
+
+    return URL(filePath: path)
   }
 }
 

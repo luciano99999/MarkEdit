@@ -25,11 +25,10 @@ final class EditorViewController: NSViewController {
   var mouseExitedWindow = false
   var nativeSearchQueryChanged = false
   var bottomPanelHeight: Double = 0
-  var initialContent: String?
+  var pendingResetCount: Int = 0
   var webBackgroundColor = AppPreferences.Window.cachedBackgroundColor?.nsColor
   var localEventMonitor: Any?
   var textBoxInputObserver: Any?
-  var writingToolsObservation: NSKeyValueObservation?
   var safeAreaObservation: NSKeyValueObservation?
   var userDefinedMenuItems = [EditorMenuItem]()
 
@@ -154,14 +153,18 @@ final class EditorViewController: NSViewController {
       ))
     }
 
-    let config: WKWebViewConfiguration = .newConfig(disableCors: AppRuntimeConfig.disableCorsRestrictions)
+    let config: WKWebViewConfiguration = .newConfig(
+      disableCors: AppRuntimeConfig.disableCorsRestrictions,
+      disabledFeatures: AppRuntimeConfig.disabledWebKitFeatures
+    )
+
     config.userContentController = controller
     config.applicationNameForUserAgent = "\(ProcessInfo.processInfo.userAgent) \(Bundle.main.userAgent)"
     config.allowsInlinePredictions = NSSpellChecker.InlineCompletion.webKitEnabled
 
     let chunkLoader = EditorChunkLoader()
     let imageLoader = EditorImageLoader { [weak self] in
-      self?.document?.folderURL
+      self?.document?.baseURL
     }
 
     config.setURLSchemeHandler(chunkLoader, forURLScheme: EditorChunkLoader.scheme)
@@ -177,6 +180,7 @@ final class EditorViewController: NSViewController {
     webView.allowsMagnification = true
     webView.uiDelegate = self
     webView.actionDelegate = self
+    webView.disableWindowOcclusionDetection()
 
     let theme = AppTheme.current.editorTheme
     DispatchQueue.global(qos: .userInitiated).async {
@@ -225,14 +229,25 @@ final class EditorViewController: NSViewController {
     }
   }()
 
+  private var initialContent: String?
+  private var lastResetDocumentID: ObjectIdentifier?
+  private var writingToolsObservation: NSKeyValueObservation?
+
   // For CoreEditor preload
   private var loadingContinuations = [CheckedContinuation<Void, Never>]()
+  private var resetContinuations = [CheckedContinuation<Void, Never>]()
 
   deinit {
     if let monitor = localEventMonitor {
       NSEvent.removeMonitor(monitor)
       localEventMonitor = nil
     }
+
+    loadingContinuations.forEach { $0.resume() }
+    loadingContinuations.removeAll()
+
+    resetContinuations.forEach { $0.resume() }
+    resetContinuations.removeAll()
   }
 
   init(preloadDelay: TimeInterval? = nil) {
@@ -322,6 +337,16 @@ extension EditorViewController {
     }
   }
 
+  func waitUntilEditorReset() async {
+    guard pendingResetCount > 0 else {
+      return
+    }
+
+    await withCheckedContinuation {
+      resetContinuations.append($0)
+    }
+  }
+
   func prepareInitialContent(_ text: String) {
     if hasFinishedLoading {
       prependTextContent(text)
@@ -334,31 +359,24 @@ extension EditorViewController {
     bridge.core.insertText(text: text, from: 0, to: 0)
   }
 
-  func clearEditor() {
-    updateTextFinderMode(.hidden, searchTerm: "")
-
-    // The delay is in theory not necessary,
-    // because autosave happens before closing the window.
-    //
-    // Just in case someone introduces race conditions.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-      self.bridge.core.clearEditor()
-    }
-  }
-
   func resetEditor() {
-    guard hasFinishedLoading, let textContent = document?.stringValue else {
+    guard hasFinishedLoading, let document else {
       return
     }
 
+    let textContent = document.stringValue
+    let documentID = ObjectIdentifier(document)
+
+    let documentChanged = lastResetDocumentID != documentID
+    lastResetDocumentID = documentID
+
     let selectionRange: SelectionRange? = {
-      guard AppRuntimeConfig.restoreLastSelection, let fileURL = document?.fileURL else {
+      // CoreEditor preserves selection for same-document resets
+      guard documentChanged else {
         return nil
       }
 
-      // Content was reloaded from disk due to an external edit, discard stale offsets
-      if document?.hasBeenReverted == true {
-        EditorSelectionHistory.discard(for: fileURL)
+      guard AppRuntimeConfig.restoreLastSelection, let fileURL = document.fileURL else {
         return nil
       }
 
@@ -367,13 +385,32 @@ extension EditorViewController {
       return EditorSelectionHistory.selectionRange(for: fileURL, fileSize: fileSize)
     }()
 
-    bridge.core.resetEditor(text: textContent, selectionRange: selectionRange) { [weak self] _ in
-      self?.webView.magnification = 1.0
+    if documentChanged {
+      webView.magnification = 1.0
+    }
+
+    pendingResetCount += 1
+    Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+
+      _ = try? await self.bridge.core.resetEditor(
+        text: textContent,
+        selectionRange: selectionRange,
+        documentChanged: documentChanged
+      )
+
+      self.pendingResetCount -= 1
+      if self.pendingResetCount == 0 {
+        self.resetContinuations.forEach { $0.resume() }
+        self.resetContinuations.removeAll()
+      }
 
       // Initial content from scenarios like "CreateNewDocumentIntent" or "New File from Clipboard"
-      if let text = self?.initialContent {
-        self?.prependTextContent(text)
-        self?.initialContent = nil
+      if let text = self.initialContent {
+        self.prependTextContent(text)
+        self.initialContent = nil
       }
     }
 

@@ -18,12 +18,38 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
   override func windowDidLoad() {
     super.windowDidLoad()
-    window?.minSize = CGSize(width: 240, height: 0)
     window?.backgroundColor = .controlBackgroundColor
 
     windowFrameAutosaveName = "Editor"
     window?.setFrameUsingName(windowFrameAutosaveName)
     saveWindowRect()
+  }
+
+  override func showWindow(_ sender: Any?) {
+    if shouldWaitResetting {
+      // Snapshot the caller's tabbing preference,
+      // it may be reset before our deferred super call.
+      let callerTabbingPreference = NSWindow.allowsAutomaticWindowTabbing
+
+      Task { @MainActor [weak self] in
+        guard let self else {
+          return
+        }
+
+        // Defer the actual show until the editor finishes its first paint
+        await self.editorViewController?.waitUntilEditorReset()
+
+        let tabbingToRestore = NSWindow.allowsAutomaticWindowTabbing
+        NSWindow.allowsAutomaticWindowTabbing = callerTabbingPreference
+
+        self.showWindowImmediately(sender)
+        NSWindow.allowsAutomaticWindowTabbing = tabbingToRestore
+      }
+
+      return
+    }
+
+    showWindowImmediately(sender)
   }
 
   func windowDidBecomeMain(_ notification: Notification) {
@@ -45,12 +71,15 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 
     // The shared "field editor" tends to hold focus,
     // manually resign the focus to ensure cmd-f responds correctly.
-    for editor in EditorReusePool.shared.viewControllers() where editor !== editorViewController {
+    for editor in EditorPreloader.shared.viewControllers() where editor !== editorViewController {
       editor.resignFindPanelFocus()
     }
 
     // The main menu is a singleton, we need to update the menu items for the active editor
     editorViewController?.resetUserDefinedMenuItems()
+
+    // Try if warmup can fix the empty suggestion bug
+    NSSpellChecker.warmUp
   }
 
   func windowDidResignKey(_ notification: Notification) {
@@ -87,10 +116,6 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     return true
   }
 
-  func windowWillClose(_ notification: Notification) {
-    editorViewController?.clearEditor()
-  }
-
   // Refresh titlebar appearance after fullscreen transitions,
   // when the final `.fullScreen` style mask bit is available.
   func windowDidEnterFullScreen(_ notification: Notification) {
@@ -107,6 +132,18 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
 private extension EditorWindowController {
   var editorViewController: EditorViewController? {
     contentViewController as? EditorViewController
+  }
+
+  var shouldWaitResetting: Bool {
+    guard let editor = editorViewController else {
+      return false
+    }
+
+    return editor.hasFinishedLoading && editor.pendingResetCount > 0
+  }
+
+  func showWindowImmediately(_ sender: Any?) {
+    super.showWindow(sender)
   }
 
   func updateTitleBarAppearance() {

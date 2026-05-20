@@ -1,7 +1,7 @@
 import { EditorView } from '@codemirror/view';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { extensions } from './extensions';
-import { globalState, editingState } from './common/store';
+import { globalState } from './common/store';
 import { almostEqual, afterDomUpdate, getViewportScale, isReleaseMode, isMotionReduced } from './common/utils';
 
 import hasSelection from './modules/selection/hasSelection';
@@ -18,7 +18,6 @@ import { getLineBreak, normalizeLineBreaks } from './modules/lineEndings';
 import { removeFrontMatter } from './modules/frontMatter';
 import { selectedMainText, scrollIntoView, caretScrollDefaults } from './modules/selection';
 import { selectedLineColumn } from './modules/selection/selectedLineColumn';
-import { SelectionRange } from './modules/selection/types';
 import { markContentClean } from './modules/history';
 import { updateTextChecker } from './modules/textChecker';
 
@@ -62,13 +61,28 @@ export enum ReplaceGranularity {
 /**
  * Reset the editor to the initial state.
  */
-export function resetEditor(initialContent: string, selectionRange?: SelectionRange) {
-  // Idle state change should always go first
-  editingState.isIdle = false;
+export async function resetEditor(
+  initialContent: string,
+  selectionRange?: { anchor: number; head: number },
+  documentChanged: boolean = true,
+): Promise<boolean> {
+  // Used to restore the scroll position if the document is not changed
+  const previousOffset = (() => {
+    if (documentChanged) {
+      return undefined;
+    }
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (typeof window.editor?.destroy === 'function') {
-    window.editor.destroy();
+    const scrollDOM = (window.editor as EditorView | undefined)?.scrollDOM;
+    if (scrollDOM === undefined) {
+      return undefined;
+    }
+
+    return { top: scrollDOM.scrollTop, left: scrollDOM.scrollLeft };
+  })();
+
+  // Used to restore the selection if the document is not changed
+  if (!documentChanged && typeof window.editor === 'object') {
+    selectionRange = window.editor.state.selection.main;
   }
 
   const lineBreak = getLineBreak(initialContent, window.config.defaultLineBreak);
@@ -76,7 +90,12 @@ export function resetEditor(initialContent: string, selectionRange?: SelectionRa
   const initialSelection = normalizeSelection(initialDoc.length, selectionRange);
   const selectionRestored = selectionRange !== undefined && (selectionRange.anchor !== 0 || selectionRange.head !== 0);
 
-  const editor = new EditorView({
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof window.editor?.destroy === 'function') {
+    window.editor.destroy();
+  }
+
+  window.editor = new EditorView({
     state: EditorState.create({
       doc: initialDoc,
       selection: initialSelection,
@@ -84,13 +103,13 @@ export function resetEditor(initialContent: string, selectionRange?: SelectionRa
     }),
     parent: document.querySelector('#editor') ?? document.body,
     // Initial scroll to avoid an extra transaction
-    scrollTo: selectionRestored
+    scrollTo: (selectionRestored && previousOffset === undefined)
       ? EditorView.scrollIntoView(initialSelection.head, caretScrollDefaults)
       : undefined,
   });
 
+  const editor = window.editor;
   editor.focus();
-  window.editor = editor;
 
   MarkEdit.editorView = editor;
   (MarkEdit.editorAPI as TextEditor).setView(editor);
@@ -110,6 +129,7 @@ export function resetEditor(initialContent: string, selectionRange?: SelectionRa
   setTimeout(ensureLineHeight, 1000);
 
   const contentDOM = editor.contentDOM;
+  contentDOM.dataset.language = 'markdown'; // Because of the front-matter wrapper
   contentDOM.addEventListener('blur', handleFocusLost);
 
   updateTextChecker(contentDOM, {
@@ -121,7 +141,10 @@ export function resetEditor(initialContent: string, selectionRange?: SelectionRa
   observeContentHeightChanges(scrollDOM);
   fixWebKitWheelIssues(scrollDOM);
 
-  if (!selectionRestored) {
+  if (previousOffset !== undefined) {
+    // Apply after the next frame so the viewport has been measured
+    requestAnimationFrame(() => scrollDOM.scrollTo(previousOffset));
+  } else if (!selectionRestored) {
     // Makes sure the content doesn't have unwanted inset
     scrollIntoView(0, window.config.typewriterMode ? 'center' : undefined);
     // scrollIntoView doesn't work when the app is idle
@@ -171,19 +194,24 @@ export function resetEditor(initialContent: string, selectionRange?: SelectionRa
 
   // For user scripts, notify the editor is ready
   editorReadyListeners().forEach(listener => listener(editor));
-}
 
-/**
- * Clear the editor, set the content to empty.
- */
-export function clearEditor() {
-  // Idle state change should always go first
-  editingState.isIdle = true;
+  // Wait for the first paint: rAF when foregrounded, setTimeout as a fallback when throttled
+  await new Promise<void>(resolve => {
+    let settled = false;
+    const unblockWaiting = () => {
+      if (settled) {
+        return;
+      }
 
-  const editor = window.editor;
-  editor.dispatch({
-    changes: { from: 0, to: editor.state.doc.length, insert: '' },
+      settled = true;
+      resolve();
+    };
+
+    requestAnimationFrame(unblockWaiting);
+    afterDomUpdate(unblockWaiting);
   });
+
+  return true;
 }
 
 export function getEditorState() {
@@ -249,6 +277,23 @@ export function replaceText(text: string, granularity: ReplaceGranularity) {
     case ReplaceGranularity.selection:
       replaceSelections(text);
       break;
+  }
+}
+
+/**
+ * Insert text at the current drop cursor position, used by the native file-drop handler.
+ */
+export function performTextDrop(text: string) {
+  const editor = window.editor;
+  const cursor = editor.scrollDOM.querySelector('.cm-dropCursor');
+  const rect = cursor?.getBoundingClientRect();
+  const pos = rect ? editor.posAtCoords({ x: rect.left, y: rect.top + rect.height * 0.5 }) : null;
+  editor.contentDOM.dispatchEvent(new DragEvent('dragend'));
+
+  if (pos === null) {
+    replaceSelections(text);
+  } else {
+    insertText(text, pos, pos);
   }
 }
 

@@ -17,6 +17,10 @@ final class AppDocumentController: NSDocumentController {
   static var suggestedTextEncoding: EditorTextEncoding?
   static var suggestedFilename: String?
 
+  override var maximumRecentDocumentCount: Int {
+    8
+  }
+
   override func beginOpenPanel(_ openPanel: NSOpenPanel, forTypes inTypes: [String]?) async -> Int {
     if let defaultDirectory = AppRuntimeConfig.defaultOpenDirectory {
       setOpenPanelDirectory(defaultDirectory)
@@ -62,8 +66,8 @@ final class AppDocumentController: NSDocumentController {
     }
 
     Task { @MainActor in
-      // Ensure the reuse pool has a fully loaded editor before opening the document
-      await EditorReusePool.shared.prepareViewController()
+      // Ensure the preloader has a fully loaded editor before opening the document
+      await EditorPreloader.shared.prepareViewController()
 
       super.openDocument(
         withContentsOf: url,

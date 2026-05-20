@@ -6,6 +6,7 @@
 //
 
 import WebKit
+import AppKitExtensions
 import MarkEditKit
 
 /**
@@ -40,6 +41,7 @@ protocol EditorWebViewActionDelegate: AnyObject {
   func editorWebViewResignFirstResponder(_ webView: EditorWebView)
   func editorWebView(_ webView: EditorWebView, mouseDownWith event: NSEvent)
   func editorWebView(_ webView: EditorWebView, didSelect menuAction: EditorWebViewMenuAction)
+  func editorWebView(_ webView: EditorWebView, didDrop fileURLs: [URL])
 
   func editorWebView(
     _ webView: EditorWebView,
@@ -150,6 +152,27 @@ final class EditorWebView: WKWebView {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
       self.updateMenuItems(menu: menu)
     }
+  }
+
+  override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+    // Let WebKit handle internal text drags
+    guard !(sender.draggingSource is WKWebView) else {
+      return super.performDragOperation(sender)
+    }
+
+    // Ignore placeholder file URLs (e.g. `file://`, unresolved promise drags) that
+    // would otherwise produce nonsensical links like `[](../../..)`.
+    let fileURLs = (sender.draggingPasteboard.fileURLs ?? []).filter { url in
+      !url.lastPathComponent.isEmpty && url.lastPathComponent != "/"
+    }
+
+    guard !fileURLs.isEmpty else {
+      return super.performDragOperation(sender)
+    }
+
+    // Forward sensible file drop requests
+    actionDelegate?.editorWebView(self, didDrop: fileURLs)
+    return true
   }
 
   override func resignFirstResponder() -> Bool {
