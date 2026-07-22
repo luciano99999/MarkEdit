@@ -580,6 +580,12 @@
             "state": "new",
             "value": "(settings.json)"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "(settings.json)"
+          }
         }
       },
       "shouldTranslate": false
@@ -1282,6 +1288,12 @@
           "stringUnit": {
             "state": "new",
             "value": "Writing Tools (Placeholder)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strumenti di scrittura"
           }
         }
       },
@@ -2165,6 +2177,12 @@
           "stringUnit": {
             "state": "new",
             "value": "Writing Tools (Placeholder)"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strumenti di scrittura"
           }
         }
       },
@@ -3090,6 +3108,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "管理擴充功能…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci estensioni…"
           }
         }
       }

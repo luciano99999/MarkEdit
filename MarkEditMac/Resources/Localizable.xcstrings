@@ -15,6 +15,12 @@
             "state": "translated",
             "value": "**作者：**%@"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**Autore:** %@"
+          }
         }
       }
     },
@@ -31,6 +37,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "**連結：**%@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**URL:** %@"
           }
         }
       }
@@ -107,6 +119,12 @@
                 }
               }
             }
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld estensioni"
           }
         }
       }
@@ -286,6 +304,12 @@
             "state": "translated",
             "value": "操作"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azioni"
+          }
         }
       }
     },
@@ -439,6 +463,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "更新前詢問"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiedi prima di aggiornare"
           }
         }
       }
@@ -921,6 +951,12 @@
             "state": "translated",
             "value": "在擴充功能目錄中找不到“%@”。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile trovare l'estensione “%@” nel registro."
+          }
         }
       }
     },
@@ -937,6 +973,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法連接擴充功能目錄。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile raggiungere il registro delle estensioni."
           }
         }
       }
@@ -1275,6 +1317,12 @@
             "state": "translated",
             "value": "發現"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scopri"
+          }
         }
       }
     },
@@ -1384,6 +1432,12 @@
             "state": "translated",
             "value": "已啟用"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abilitata"
+          }
         }
       }
     },
@@ -1491,6 +1545,12 @@
             "state": "translated",
             "value": "擴充功能已安裝"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estensione installata"
+          }
         }
       }
     },
@@ -1508,6 +1568,12 @@
             "state": "translated",
             "value": "有可用的擴充功能更新"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamenti estensioni disponibili"
+          }
         }
       }
     },
@@ -1524,6 +1590,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "擴充功能已更新"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estensioni aggiornate"
           }
         }
       }
@@ -1564,6 +1636,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法安裝該擴充功能。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installazione dell'estensione non riuscita."
           }
         }
       }
@@ -2114,6 +2192,12 @@
             "state": "translated",
             "value": "首頁"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homepage"
+          }
         }
       }
     },
@@ -2429,6 +2513,12 @@
             "state": "translated",
             "value": "安裝"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa"
+          }
         }
       }
     },
@@ -2445,6 +2535,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "要安裝“%@”嗎？"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installare “%@”?"
           }
         }
       }
@@ -2463,6 +2559,12 @@
             "state": "translated",
             "value": "從 URL 安裝擴充功能"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa estensione da URL"
+          }
         }
       }
     },
@@ -2480,6 +2582,12 @@
             "state": "translated",
             "value": "從 URL 安裝…"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa da URL…"
+          }
         }
       }
     },
@@ -2496,6 +2604,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "已安裝"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installate"
           }
         }
       }
@@ -2634,6 +2748,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "稍後"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più tardi"
           }
         }
       }
@@ -2790,6 +2910,12 @@
             "state": "translated",
             "value": "本機"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locale"
+          }
         }
       }
     },
@@ -2876,6 +3002,12 @@
             "state": "translated",
             "value": "MarkEdit 擴充功能"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estensioni di MarkEdit"
+          }
         }
       }
     },
@@ -2960,6 +3092,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "從不檢查"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non verificare mai"
           }
         }
       }
@@ -3115,6 +3253,12 @@
             "state": "translated",
             "value": "未找到擴充功能。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna estensione trovata."
+          }
         }
       }
     },
@@ -3132,6 +3276,12 @@
             "state": "translated",
             "value": "未安裝擴充功能。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna estensione installata."
+          }
         }
       }
     },
@@ -3148,6 +3298,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒有可用更新。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun aggiornamento disponibile."
           }
         }
       }
@@ -3235,6 +3391,12 @@
             "state": "translated",
             "value": "官方"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ufficiale"
+          }
         }
       }
     },
@@ -3297,6 +3459,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "打開指令碼目錄"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri cartella script"
           }
         }
       }
@@ -3579,6 +3747,12 @@
             "state": "translated",
             "value": "最近使用"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usati di recente"
+          }
         }
       }
     },
@@ -3619,6 +3793,12 @@
             "state": "translated",
             "value": "重新整理"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna"
+          }
         }
       }
     },
@@ -3635,6 +3815,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新整理中…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento in corso…"
           }
         }
       }
@@ -3676,6 +3862,12 @@
             "state": "translated",
             "value": "重新啟動"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riavvia"
+          }
         }
       }
     },
@@ -3692,6 +3884,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新啟動 MarkEdit 以開始使用“%@”。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riavvia MarkEdit per iniziare a usare “%@”."
           }
         }
       }
@@ -3710,6 +3908,12 @@
             "state": "translated",
             "value": "重新啟動 MarkEdit 以使用更新後的擴充功能。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riavvia MarkEdit per usare le estensioni aggiornate."
+          }
         }
       }
     },
@@ -3726,6 +3930,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新啟動以套用變更。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riavvia per applicare le modifiche."
           }
         }
       }
@@ -3905,6 +4115,12 @@
             "state": "translated",
             "value": "重試"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova"
+          }
         }
       }
     },
@@ -3921,6 +4137,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nel Finder"
           }
         }
       }
@@ -3983,6 +4205,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "搜尋"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca"
           }
         }
       }
@@ -4231,6 +4459,12 @@
             "state": "translated",
             "value": "顯示可用更新"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra aggiornamenti disponibili"
+          }
         }
       }
     },
@@ -4271,6 +4505,12 @@
             "state": "translated",
             "value": "僅顯示更新"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra solo aggiornamenti"
+          }
         }
       }
     },
@@ -4287,6 +4527,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示書寫工具"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra Strumenti di scrittura"
           }
         }
       }
@@ -4419,6 +4665,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "提交擴充功能…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia un'estensione…"
           }
         }
       }
@@ -4713,6 +4965,12 @@
             "state": "translated",
             "value": "無法下載或驗證該擴充功能。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile scaricare o verificare l'estensione."
+          }
         }
       }
     },
@@ -4753,6 +5011,12 @@
             "state": "translated",
             "value": "此擴充功能需要 MarkEdit %@ 或更高版本。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa estensione richiede MarkEdit %@ o successivo."
+          }
         }
       }
     },
@@ -4769,6 +5033,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "此擴充功能擁有對編輯器的完整取用權限。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa estensione viene eseguita con accesso completo all'editor."
           }
         }
       }
@@ -4810,6 +5080,12 @@
             "state": "translated",
             "value": "這會從指令碼目錄中移除它的指令碼。"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo rimuoverà lo script dalla cartella degli script."
+          }
         }
       }
     },
@@ -4826,6 +5102,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "此來源未經 MarkEdit 審核，請僅在信任該來源時繼續。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa sorgente non è verificata da MarkEdit. Continua solo se ritieni la sorgente attendibile."
           }
         }
       }
@@ -4982,6 +5264,12 @@
             "state": "translated",
             "value": "關閉後仍保留擴充功能，但使其不啟用"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disattiva per mantenere l'estensione installata ma non attiva"
+          }
         }
       }
     },
@@ -5068,6 +5356,12 @@
             "state": "translated",
             "value": "解除安裝"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disinstalla"
+          }
         }
       }
     },
@@ -5084,6 +5378,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "要解除安裝“%@”嗎？"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disinstallare “%@”?"
           }
         }
       }
@@ -5102,6 +5402,12 @@
             "state": "translated",
             "value": "更新"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna"
+          }
         }
       }
     },
@@ -5118,6 +5424,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "全部更新"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna tutto"
           }
         }
       }
@@ -5136,6 +5448,12 @@
             "state": "translated",
             "value": "自動更新"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna automaticamente"
+          }
         }
       }
     },
@@ -5152,6 +5470,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "更新行為"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comportamento aggiornamenti"
           }
         }
       }
@@ -5215,6 +5539,12 @@
             "state": "translated",
             "value": "更新到 %@"
           }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna a %@"
+          }
         }
       }
     },
@@ -5231,6 +5561,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "更新"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamenti"
           }
         }
       }
@@ -5270,6 +5606,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "更新中…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiornamento in corso…"
           }
         }
       }
