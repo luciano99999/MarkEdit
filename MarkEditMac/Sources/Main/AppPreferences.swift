@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import AppKitExtensions
 import UniformTypeIdentifiers
 import MarkEditCore
 import MarkEditKit
@@ -250,6 +251,11 @@ enum AppPreferences {
     @Storage(key: "updater.completely-disabled", defaultValue: false)
     static var completelyDisabled: Bool
   }
+
+  enum Extensions {
+    @Storage(key: "extensions.window-has-been-opened", defaultValue: false)
+    static var windowHasBeenOpened: Bool
+  }
 }
 
 extension FontStyle {
@@ -285,6 +291,12 @@ extension AppPreferences {
       lineHeight: Editor.lineHeight.multiplier,
       suggestWhileTyping: Assistant.suggestWhileTyping,
       standardDirectories: URL.standardDirectories,
+      runtimeInfo: RuntimeInfo(
+        appVersion: Bundle.main.shortVersionString ?? "1.0.0",
+        appBuild: Bundle.main.bundleVersion ?? "1",
+        osVersion: ProcessInfo.processInfo.semanticOSVer,
+        webkitVersion: Bundle.webkitBundle?.bundleVersion ?? ""
+      ),
       defaultLineBreak: General.defaultLineEndings.characters,
       tabKeyBehavior: Editor.tabKeyBehavior.rawValue,
       indentUnit: Editor.indentUnit.characters,
@@ -292,6 +304,7 @@ extension AppPreferences {
       // Runtime config from settings.json, not dynamically changeable
       autoCharacterPairs: AppRuntimeConfig.autoCharacterPairs,
       indentBehavior: AppRuntimeConfig.indentBehavior,
+      undoGroupingInterval: AppRuntimeConfig.undoGroupingInterval,
       headerFontSizeDiffs: AppRuntimeConfig.headerFontSizeDiffs,
       visibleWhitespaceCharacter: AppRuntimeConfig.visibleWhitespaceCharacter,
       visibleLineBreakCharacter: AppRuntimeConfig.visibleLineBreakCharacter,

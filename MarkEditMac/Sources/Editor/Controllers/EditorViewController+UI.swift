@@ -6,7 +6,8 @@
 //
 
 import AppKit
-import AppKitControls
+import AppKitExtensions
+import SharedUI
 import WebKit
 import MarkEditKit
 import Statistics
@@ -32,11 +33,11 @@ extension EditorViewController {
 
     if AppDesign.modernTitleBar {
       wrapper.addSubview(modernEffectView)
-      wrapper.addSubview(modernTintedView)
       wrapper.addSubview(modernDividerView)
     }
 
     // The divider must be on very top
+    panelDivider.alphaValue = AppDesign.dividerAlpha
     wrapper.addSubview(panelDivider)
 
     layoutPanels()
@@ -52,28 +53,13 @@ extension EditorViewController {
         modernBackgroundView.topAnchor.constraint(equalTo: modernEffectView.bottomAnchor),
       ])
 
-      if let effectView = modernEffectView as? NSVisualEffectView {
-        effectView.material = .titlebar
-      } else if #available(macOS 26.0, *) {
-        (modernEffectView as? NSGlassEffectView)?.cornerRadius = 0
-      }
-
-      modernEffectView.clipsToBounds = true // To cut the shadows
+      modernEffectView.material = .titlebar
       modernEffectView.translatesAutoresizingMaskIntoConstraints = false
       NSLayoutConstraint.activate([
         modernEffectView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
         modernEffectView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
         modernEffectView.topAnchor.constraint(equalTo: wrapper.topAnchor),
         modernEffectHeight,
-      ])
-
-      // It covers precisely to provide a tinted color
-      modernTintedView.translatesAutoresizingMaskIntoConstraints = false
-      NSLayoutConstraint.activate([
-        modernTintedView.leadingAnchor.constraint(equalTo: modernEffectView.leadingAnchor),
-        modernTintedView.trailingAnchor.constraint(equalTo: modernEffectView.trailingAnchor),
-        modernTintedView.topAnchor.constraint(equalTo: modernEffectView.topAnchor),
-        modernTintedView.bottomAnchor.constraint(equalTo: modernEffectView.bottomAnchor),
       ])
 
       // To avoid duplicate dividers
@@ -86,7 +72,7 @@ extension EditorViewController {
 
     // Trigger an additional layout loop to correct view (find panels) positions
     safeAreaObservation = view.observe(\.safeAreaInsets) { view, _ in
-      Task { @MainActor in
+      Thread.ensureMain {
         view.needsLayout = true
       }
     }
@@ -134,9 +120,11 @@ extension EditorViewController {
   }
 
   func updateWindowColors(_ theme: AppTheme) {
+    let titlebarView = view.window?.titlebarView
     let backgroundColor = webBackgroundColor ?? theme.windowBackground
+
     view.window?.backgroundColor = backgroundColor
-    view.window?.toolbarContainerView?.layerBackgroundColor = backgroundColor
+    titlebarView?.layerBackgroundColor = backgroundColor
 
     let prefersTintedToolbar = theme.prefersTintedToolbar || backgroundColor.isTintedColor
     (view.window as? EditorWindow)?.prefersTintedToolbar = prefersTintedToolbar
@@ -148,35 +136,17 @@ extension EditorViewController {
       let baseColor = backgroundColor.withAlphaComponent(reduceTransparency ? 1.0 : 0.01)
 
       view.window?.backgroundColor = baseColor
-      view.window?.toolbarContainerView?.layerBackgroundColor = baseColor
+      titlebarView?.layerBackgroundColor = baseColor
 
       modernBackgroundView.layerBackgroundColor = backgroundColor
       modernEffectView.isHidden = reduceTransparency
-      modernTintedView.layerBackgroundColor = baseColor
 
-      let alphaValue = {
-        if modernEffectView is NSVisualEffectView {
-          return prefersTintedToolbar ? 0.7 : 0.3
-        }
+      // The effect view is hidden when transparency is reduced, so the material only matters otherwise
+      let material = AppRuntimeConfig.toolbarTranslucency.material
+      modernEffectView.backdropBlur = material.backdropBlur
 
-        // Glass view needs less transparent color to be tinted
-        return prefersTintedToolbar ? 0.8 : 0.5
-      }()
-
-      let tintColor = backgroundColor.withAlphaComponent(alphaValue).resolvedColor()
-
-      // For NSGlassEffectView, the built-in tintColor is preferred
-      if #available(macOS 26.0, *), let glassView = modernEffectView as? NSGlassEffectView {
-        glassView.tintColor = tintColor
-        glassView.layerBackgroundColor = backgroundColor.withAlphaComponent(0.66)
-      } else {
-        modernTintedView.layerBackgroundColor = tintColor
-      }
-
-      // Hide the effect view and remove the opacity of the title bar view
-      if reduceTransparency {
-        modernTintedView.layerBackgroundColor = backgroundColor
-      }
+      let alphaValue = prefersTintedToolbar ? material.tintedOpacity : material.plainOpacity
+      modernEffectView.tintColor = backgroundColor.withAlphaComponent(alphaValue).resolvedColor()
     }
 
     statusView.setBackgroundColor(backgroundColor)
@@ -226,7 +196,7 @@ extension EditorViewController {
 
     if AppDesign.modernTitleBar {
       modernEffectHeight.constant = view.safeAreaInsets.top + panelDivider.frame.height
-      modernDividerView.update(animated).alphaValue = findPanel.mode == .hidden ? 0 : 1
+      modernDividerView.update(animated).alphaValue = findPanel.mode == .hidden ? 0 : AppDesign.dividerAlpha
     } else {
       // To avoid duplicate dividers on legacy titlebar
       panelDivider.isHidden = findPanel.mode == .hidden
@@ -472,14 +442,9 @@ extension EditorViewController {
 
   func showTextBox(title: String?, placeholder: String?, defaultValue: String?) async -> String? {
     class TextField: NSTextField {
-      override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // The default "selectAll" is not available here
-        if event.userModifierFlags == .command, event.keyCode == .kVK_ANSI_A {
-          currentEditor()?.selectAll(nil)
-          return true
-        }
-
-        return super.performKeyEquivalent(with: event)
+      // The main menu binds "Select All" to `selectWholeDocument(_:)`
+      @IBAction func selectWholeDocument(_ sender: Any?) {
+        currentEditor()?.selectAll(nil)
       }
     }
 
@@ -488,26 +453,11 @@ extension EditorViewController {
     alert.addButton(withTitle: Localized.General.done)
     alert.addButton(withTitle: Localized.General.cancel)
 
-    let textField = TextField(frame: CGRect(x: 0, y: 0, width: 256, height: 22))
+    let textField = TextField.alertCapableTextField
     textField.placeholderString = placeholder
     textField.stringValue = defaultValue ?? ""
     alert.accessoryView = textField
-
-    textBoxInputObserver = NotificationCenter.default.addObserver(
-      forName: NSWindow.didBecomeKeyNotification,
-      object: nil,
-      queue: .main
-    ) { [weak self] notification in
-      Task { @MainActor in
-        if let window = notification.object as? NSWindow, window == textField.window {
-          window.makeFirstResponder(textField)
-          if let observer = self?.textBoxInputObserver {
-            self?.textBoxInputObserver = nil
-            NotificationCenter.default.removeObserver(observer)
-          }
-        }
-      }
-    }
+    alert.window.initialFirstResponder = textField
 
     let response = await presentSheetModal(alert)
     return response == .alertFirstButtonReturn ? textField.stringValue : nil
@@ -539,6 +489,12 @@ extension EditorViewController {
 private extension EditorViewController {
   final class UserDefinedMenuItem: NSMenuItem {
     var stateGetterID: String?
+
+    override var image: NSImage? {
+      didSet {
+        ensureImageVisibility()
+      }
+    }
   }
 
   var contentHeight: Double {
@@ -670,7 +626,7 @@ private extension EditorViewController {
       return nil
     }
 
-    if let image = NSImage(systemSymbolName: icon, accessibilityDescription: nil) {
+    if let image = NSImage(systemSymbolName: icon) {
       return image
     }
 

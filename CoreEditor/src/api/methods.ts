@@ -2,7 +2,12 @@ import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { LanguageDescription } from '@codemirror/language';
 import { MarkdownConfig } from '@lezer/markdown';
+import { RuntimeInfo } from 'markedit-api';
 import { markdownConfigurations } from '../extensions';
+
+export function onAppReady(listener: () => void) {
+  storage.appReadyListeners.push(listener);
+}
 
 export function onEditorReady(listener: (editorView: EditorView) => void) {
   storage.editorReadyListeners.push(listener);
@@ -12,12 +17,34 @@ export function onEditorReady(listener: (editorView: EditorView) => void) {
   }
 }
 
+export function notifyAppReady() {
+  storage.appReadyListeners.forEach(listener => listener());
+  storage.appReadyListeners = [];
+}
+
 export async function saveDocument(): Promise<boolean> {
   return window.nativeModules.api.saveDocument();
 }
 
 export async function closeDocument(): Promise<boolean> {
   return window.nativeModules.api.closeDocument();
+}
+
+export function runtimeInfo(): RuntimeInfo {
+  const runtimeInfo = window.config.runtimeInfo;
+  if (runtimeInfo === undefined) {
+    throw new Error('MarkEdit.runtimeInfo() is not implemented in this context.');
+  }
+
+  return runtimeInfo;
+}
+
+export function terminateApp(): void {
+  window.nativeModules.api.terminateApp();
+}
+
+export function relaunchApp(): void {
+  window.nativeModules.api.relaunchApp();
 }
 
 export function addExtension(extension: Extension) {
@@ -69,11 +96,13 @@ function isEditorReady() {
 }
 
 const storage: {
+  appReadyListeners: (() => void)[];
   editorReadyListeners: ((editorView: EditorView) => void)[];
   extensions: Extension[];
   markdownConfigs: MarkdownConfig[];
   codeLanguages: LanguageDescription[];
 } = {
+  appReadyListeners: [],
   editorReadyListeners: [],
   extensions: [],
   markdownConfigs: [],

@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import SharedUI
 import MarkEditCore
 import MarkEditKit
 
@@ -14,9 +15,61 @@ import MarkEditKit
 /// The underlying file is stored as "settings.json" in AppCustomization.
 enum AppRuntimeConfig {
   struct Definition: Codable {
-    enum VisualEffectType: String, Codable {
-      case glass = "glass"
-      case blur = "blur"
+    enum ToolbarTranslucency: Codable {
+      case readable
+      case `default`
+      case vibrant
+      case custom(backdropBlur: Double, tintedOpacity: Double, plainOpacity: Double)
+
+      /// Backdrop material: backdropBlur, tintedOpacity, plainOpacity.
+      ///
+      /// For the presets, readable/default/vibrant step along one "reveal" axis. Tint reads linearly so it
+      /// steps arithmetically (default = midpoint); blur reads logarithmically so it steps geometrically
+      /// (default = geometric mean, double per step), with tintedOpacity = plainOpacity + 0.3.
+      ///
+      /// Custom values are used as-is and need not follow these relationships.
+      var material: (backdropBlur: Double, tintedOpacity: Double, plainOpacity: Double) {
+        switch self {
+        case .readable: return (16, 0.9, 0.6)
+        case .default: return (8, 0.7, 0.4)
+        case .vibrant: return (4, 0.5, 0.2)
+        case let .custom(backdropBlur, tintedOpacity, plainOpacity):
+          return (backdropBlur, tintedOpacity, plainOpacity)
+        }
+      }
+
+      init(from decoder: any Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "readable": self = .readable
+        case "default": self = .default
+        case "vibrant": self = .vibrant
+        default:
+          // Accept a custom "blur, tinted, plain" string, e.g. "8, 0.7, 0.4"
+          let numbers = value.split(separator: ",").compactMap {
+            Double($0.trimmingCharacters(in: .whitespaces))
+          }
+
+          guard numbers.count == 3 else {
+            Logger.log(.error, "Invalid toolbarTranslucency value: \(value)")
+            self = .default
+            return
+          }
+
+          self = .custom(backdropBlur: numbers[0], tintedOpacity: numbers[1], plainOpacity: numbers[2])
+        }
+      }
+
+      func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .readable: try container.encode("readable")
+        case .default: try container.encode("default")
+        case .vibrant: try container.encode("vibrant")
+        case let .custom(backdropBlur, tintedOpacity, plainOpacity):
+          try container.encode("\(backdropBlur), \(tintedOpacity), \(plainOpacity)")
+        }
+      }
     }
 
     enum UpdateBehavior: String, Codable {
@@ -30,20 +83,21 @@ enum AppRuntimeConfig {
       let modifiers: [String]
     }
 
+    let __schema: String?
     let autoCharacterPairs: Bool?
     let autoSaveWhenIdle: Bool?
     let closeAlwaysConfirmsChanges: Bool?
     let restoreLastSelection: Bool?
     let indentBehavior: EditorIndentBehavior?
     let writingToolsBehavior: String?
+    let undoGroupingInterval: Double?
     let headerFontSizeDiffs: [Double]?
     let visibleWhitespaceCharacter: String?
     let visibleLineBreakCharacter: String?
     let searchNormalizers: [String: String]?
     let nativeSearchQuerySync: Bool?
+    let toolbarTranslucency: ToolbarTranslucency?
     let customToolbarItems: [CustomToolbarItem]?
-    let useClassicInterface: Bool?
-    let visualEffectType: VisualEffectType?
     let updateBehavior: UpdateBehavior?
     let checksForUpdates: Bool? // [Deprecated] Kept for backward compatibility
     let defaultOpenDirectory: String?
@@ -55,20 +109,21 @@ enum AppRuntimeConfig {
     let mainWindowHotKey: HotKey?
 
     enum CodingKeys: String, CodingKey {
+      case __schema = "$schema"
       case autoCharacterPairs = "editor.autoCharacterPairs"
       case autoSaveWhenIdle = "editor.autoSaveWhenIdle"
       case closeAlwaysConfirmsChanges = "editor.closeAlwaysConfirmsChanges"
       case restoreLastSelection = "editor.restoreLastSelection"
       case indentBehavior = "editor.indentBehavior"
       case writingToolsBehavior = "editor.writingToolsBehavior"
+      case undoGroupingInterval = "editor.undoGroupingInterval"
       case headerFontSizeDiffs = "editor.headerFontSizeDiffs"
       case visibleWhitespaceCharacter = "editor.visibleWhitespaceCharacter"
       case visibleLineBreakCharacter = "editor.visibleLineBreakCharacter"
       case searchNormalizers = "editor.searchNormalizers"
       case nativeSearchQuerySync = "editor.nativeSearchQuerySync"
+      case toolbarTranslucency = "editor.toolbarTranslucency"
       case customToolbarItems = "editor.customToolbarItems"
-      case useClassicInterface = "general.useClassicInterface"
-      case visualEffectType = "general.visualEffectType"
       case updateBehavior = "general.updateBehavior"
       case checksForUpdates = "general.checksForUpdates"
       case defaultOpenDirectory = "general.defaultOpenDirectory"
@@ -138,6 +193,11 @@ enum AppRuntimeConfig {
     }
   }
 
+  static var undoGroupingInterval: Double? {
+    // Rely on CoreEditor, 300ms by default
+    currentDefinition?.undoGroupingInterval
+  }
+
   static var headerFontSizeDiffs: [Double]? {
     // Rely on CoreEditor definitions by default
     currentDefinition?.headerFontSizeDiffs
@@ -159,16 +219,12 @@ enum AppRuntimeConfig {
     currentDefinition?.nativeSearchQuerySync ?? false
   }
 
+  static var toolbarTranslucency: Definition.ToolbarTranslucency {
+    currentDefinition?.toolbarTranslucency ?? .default
+  }
+
   static var customToolbarItems: [CustomToolbarItem] {
     currentDefinition?.customToolbarItems ?? []
-  }
-
-  static var useClassicInterface: Bool {
-    currentDefinition?.useClassicInterface ?? false
-  }
-
-  static var visualEffectType: Definition.VisualEffectType {
-    currentDefinition?.visualEffectType ?? .glass
   }
 
   static var updateBehavior: Definition.UpdateBehavior {
@@ -190,12 +246,20 @@ enum AppRuntimeConfig {
   }
 
   static var disableOpenPanelOptions: Bool {
-    currentDefinition?.disableOpenPanelOptions ?? defaultDisableOpenPanelOptions
+    currentDefinition?.disableOpenPanelOptions ?? ({
+      // [macOS 26] Revisit this later,
+      // NSOpenPanel.accessoryView can significantly slow down the file opening process.
+      if #available(macOS 26.0, *) {
+        return true
+      }
+
+      return false
+    })()
   }
 
   static var disableCorsRestrictions: Bool {
-    // Enforce CORS restrictions by default
-    currentDefinition?.disableCorsRestrictions ?? false
+    // CORS restrictions are disabled by default; we're a local editor, not a browser
+    currentDefinition?.disableCorsRestrictions ?? true
   }
 
   static var disabledWebKitFeatures: [String] {
@@ -246,26 +310,27 @@ private extension AppRuntimeConfig {
   static let fileData = try? Data(contentsOf: AppCustomization.settings.fileURL)
 
   static let defaultDefinition = Definition(
+    __schema: "https://raw.githubusercontent.com/MarkEdit-app/schemas/main/settings.json",
     autoCharacterPairs: true,
     autoSaveWhenIdle: false,
     closeAlwaysConfirmsChanges: nil,
     restoreLastSelection: nil,
     indentBehavior: .never,
     writingToolsBehavior: nil, // [macOS 15] Complete mode still has lots of bugs
+    undoGroupingInterval: nil,
     headerFontSizeDiffs: nil,
     visibleWhitespaceCharacter: nil,
     visibleLineBreakCharacter: nil,
     searchNormalizers: nil,
     nativeSearchQuerySync: false,
+    toolbarTranslucency: nil, // Keeping nil allows us to tweak defaults later
     customToolbarItems: [],
-    useClassicInterface: nil,
-    visualEffectType: nil,
     updateBehavior: .quiet,
     checksForUpdates: nil,
     defaultOpenDirectory: nil,
     defaultSaveDirectory: nil,
-    disableOpenPanelOptions: defaultDisableOpenPanelOptions,
-    disableCorsRestrictions: nil,
+    disableOpenPanelOptions: nil, // [macOS 26] Future macOS with the fix can be opted out
+    disableCorsRestrictions: true,
     disabledWebKitFeatures: nil,
     preferredTerminalApp: nil,
     mainWindowHotKey: .init(key: "M", modifiers: ["Shift", "Command", "Option"])
@@ -287,20 +352,11 @@ private extension AppRuntimeConfig {
 
   static func encode(definition: Definition) -> Data? {
     let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
 
     let jsonData = try? encoder.encode(definition)
     Logger.assert(jsonData != nil, "Failed to encode object: \(definition)")
 
     return jsonData
-  }
-
-  static var defaultDisableOpenPanelOptions: Bool {
-    // [macOS 26] Revisit this later, NSOpenPanel.accessoryView can significantly slow down the file opening process
-    if #available(macOS 26.0, *) {
-      return true
-    }
-
-    return false
   }
 }

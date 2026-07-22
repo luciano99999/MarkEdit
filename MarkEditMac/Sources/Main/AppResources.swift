@@ -109,7 +109,8 @@ enum Localized {
   }
 
   enum WritingTools {
-    static let title = String(localized: "Writing Tools", comment: "Writing Tools")
+    static let featureName = String(localized: "Writing Tools", comment: "Writing Tools")
+    static let menuItemTitle = String(localized: "Show Writing Tools", comment: "Show Writing Tools")
   }
 
   enum Settings {
@@ -121,6 +122,7 @@ enum Localized {
     static let systemMono = String(localized: "System Mono", comment: "System mono font name")
     static let systemRounded = String(localized: "System Rounded", comment: "System rounded font name")
     static let systemSerif = String(localized: "System Serif", comment: "System serif font name")
+    static let recentlyUsed = String(localized: "Recently Used", comment: "Menu item to show recently used fonts")
     static let moreFonts = String(localized: "More Fonts", comment: "Menu item to browse all fonts")
     static let openFontPanel = String(localized: "Open Font Panel…", comment: "Menu item for selecting custom fonts")
     static let lightTheme = String(localized: "Light Theme:", comment: "Light theme for the editor")
@@ -243,27 +245,53 @@ enum Localized {
 //
 // Note: double check availability and deployment target before adding new icons
 enum Icons {
+  static let appleTerminal = "apple.terminal"
   static let arrowUturnBackwardCircle = "arrow.uturn.backward.circle"
   static let bold = "bold"
   static let characterCursorIbeam = "character.cursor.ibeam"
   static let chartPie = "chart.pie"
+  static let checkmarkSeal = "checkmark.seal.fill"
   static let curlybracesSquare = "curlybraces.square"
+  static let ellipsisCircle = "ellipsis.circle"
+  static let exclamationmarkBubbleFill = "exclamationmark.bubble.fill"
   static let gearshape = "gearshape"
   static let italic = "italic"
+
+  static let interfaceWindow = if #available(macOS 27.0, *) {
+    "interface.window"
+  } else {
+    "macwindow"
+  }
+
+  static let interfaceWindowOnRectangle = if #available(macOS 27.0, *) {
+    "interface.window.on.rectangle"
+  } else {
+    "macwindow.on.rectangle"
+  }
+
   static let link = "link"
   static let listBullet = "list.bullet"
   static let listBulletRectangle = "list.bullet.rectangle"
-  static let macwindow = "macwindow"
-  static let number = "number"
+
+  static let numberSign = if #available(macOS 27.0, *) {
+    "number.sign"
+  } else {
+    "number"
+  }
+
+  static let paintpalette = "paintpalette"
   static let photo = "photo"
+  static let puzzlepieceExtension = "puzzlepiece.extension"
+  static let shippingbox = "shippingbox"
+  static let sparkles = "sparkles"
   static let squareAndArrowUp = "square.and.arrow.up"
   static let squareSplit1x2 = "square.split.1x2"
   static let strikethrough = "strikethrough"
   static let tablecells = "tablecells"
-  static let terminal = "terminal"
   static let textQuote = "text.quote"
   static let textformat = "textformat"
   static let wandAndSparkles = "wand.and.sparkles"
+  static let wifiSlash = "wifi.slash"
 }
 
 extension EditorLocalizable {

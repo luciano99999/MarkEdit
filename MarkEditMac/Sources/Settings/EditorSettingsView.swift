@@ -6,9 +6,11 @@
 //
 
 import AppKit
+import AppKitExtensions
 import SwiftUI
 import FontPicker
 import SettingsUI
+import ExtensionCore
 import MarkEditCore
 import MarkEditKit
 
@@ -172,7 +174,6 @@ struct EditorSettingsView: View {
 private extension EditorSettingsView {
   enum Constants {
     static let customThemesTag = "$customThemes"
-    static let customThemesLink = "https://github.com/MarkEdit-app/MarkEdit/wiki/Extensions#list-of-themes"
   }
 
   var fontPickerConfiguration: FontPickerConfiguration {
@@ -181,8 +182,9 @@ private extension EditorSettingsView {
       selectedFontStyle: AppPreferences.Editor.fontStyle,
       selectedFontSize: AppPreferences.Editor.fontSize,
       selectButtonTitle: Localized.Settings.selectFont,
+      recentlyUsedItemTitle: Localized.Settings.recentlyUsed,
       moreFontsItemTitle: Localized.Settings.moreFonts,
-      openPanelButtonTitle: Localized.Settings.openFontPanel,
+      openPanelItemTitle: Localized.Settings.openFontPanel,
       defaultFontName: Localized.Settings.systemDefault,
       monoFontName: Localized.Settings.systemMono,
       roundedFontName: Localized.Settings.systemRounded,
@@ -210,13 +212,18 @@ private extension EditorSettingsView {
     Divider()
 
     HStack {
-      Image(systemName: Icons.wandAndSparkles)
+      Image.alwaysVisibleSymbol(named: Icons.wandAndSparkles)
       Text(Localized.Settings.getCustomThemes)
     }.tag(Constants.customThemesTag)
   }
 
   func getCustomThemes(selection: Binding<String>, revertTo value: String) {
-    NSWorkspace.shared.safelyOpenURL(string: Constants.customThemesLink)
+    ExtensionsWindowController.shared.present(scrollTo: .theme)
+    NSApp.windows.forEach {
+      if $0.contentViewController is SettingsRootViewController {
+        $0.close()
+      }
+    }
 
     // In macOS Tahoe, this requires a delay to work
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {

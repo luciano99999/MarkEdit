@@ -17,9 +17,9 @@ import { TextEditor } from './editor';
 import { Translator } from './translation';
 import { languageModel } from './languageModel';
 
-import { onEditorReady, saveDocument, closeDocument, addExtension, addMarkdownConfig, addCodeLanguage } from './methods';
+import { onAppReady, onEditorReady, saveDocument, closeDocument, addExtension, addMarkdownConfig, addCodeLanguage, runtimeInfo, terminateApp, relaunchApp } from './methods';
 import { addMainMenuItem, showContextMenu, showAlert, showTextBox, showSavePanel, runService } from './ui';
-import { openFile, createFile, deleteFile, listFiles, getFileContent, getFileObject, getFileInfo, getDirectoryPath } from './files';
+import { openFile, createFile, deleteFile, moveFile, revealFile, listFiles, getFileContent, getFileObject, getFileInfo, getDirectoryPath } from './files';
 import { getPasteboardItems, getPasteboardString } from './pasteboard';
 
 export function initMarkEditModules() {
@@ -49,6 +49,10 @@ export function initMarkEditModules() {
   MarkEdit.codemirror = codemirror;
   MarkEdit.lezer = lezer;
 
+  MarkEdit.runtimeInfo = runtimeInfo;
+  MarkEdit.terminateApp = terminateApp;
+  MarkEdit.relaunchApp = relaunchApp;
+  MarkEdit.onAppReady = onAppReady;
   MarkEdit.onEditorReady = onEditorReady;
   MarkEdit.saveDocument = saveDocument;
   MarkEdit.closeDocument = closeDocument;
@@ -64,6 +68,8 @@ export function initMarkEditModules() {
   MarkEdit.openFile = openFile;
   MarkEdit.createFile = createFile;
   MarkEdit.deleteFile = deleteFile;
+  MarkEdit.moveFile = moveFile;
+  MarkEdit.revealFile = revealFile;
   MarkEdit.listFiles = listFiles;
   MarkEdit.getFileContent = getFileContent;
   MarkEdit.getFileObject = getFileObject;

@@ -1274,6 +1274,19 @@
         }
       }
     },
+    "BWI-Qs-d6i.title": {
+      "comment": "Class = \"NSMenuItem\"; title = \"Writing Tools (Placeholder)\"; ObjectID = \"BWI-Qs-d6i\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Writing Tools (Placeholder)"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
     "BxI-nv-Xa5.title": {
       "comment": "Class = \"NSMenu\"; title = \"Table of Contents\"; ObjectID = \"BxI-nv-Xa5\";",
       "extractionState": "extracted_with_value",
@@ -2144,6 +2157,19 @@
         }
       }
     },
+    "gSc-Jf-IPB.title": {
+      "comment": "Class = \"NSMenu\"; title = \"Writing Tools (Placeholder)\"; ObjectID = \"gSc-Jf-IPB\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Writing Tools (Placeholder)"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
     "gVA-U4-sdL.title": {
       "comment": "Class = \"NSMenuItem\"; title = \"Paste\"; ObjectID = \"gVA-U4-sdL\";",
       "extractionState": "extracted_with_value",
@@ -2655,25 +2681,25 @@
       }
     },
     "J5p-F8-eb5.title": {
-      "comment": "Class = \"NSMenuItem\"; title = \"Official Extensions\"; ObjectID = \"J5p-F8-eb5\";",
+      "comment": "Class = \"NSMenuItem\"; title = \"Official Website\"; ObjectID = \"J5p-F8-eb5\";",
       "extractionState": "extracted_with_value",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Official Extensions"
+            "value": "Official Website"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "官方扩展功能"
+            "value": "官方网站"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "官方擴充功能"
+            "value": "官方網站"
           }
         },
         "it": {
@@ -3040,6 +3066,30 @@
           "stringUnit": {
             "state": "translated",
             "value": "Windows (CRLF)"
+          }
+        }
+      }
+    },
+    "MgE-xt-001.title": {
+      "comment": "Class = \"NSMenuItem\"; title = \"Manage Extensions…\"; ObjectID = \"MgE-xt-001\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Manage Extensions…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理扩展功能…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理擴充功能…"
           }
         }
       }

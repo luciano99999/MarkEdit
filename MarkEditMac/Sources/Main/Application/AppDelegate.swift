@@ -6,6 +6,7 @@
 
 import AppKit
 import AppKitExtensions
+import ExtensionCore
 import SettingsUI
 import MarkEditKit
 
@@ -30,11 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @IBOutlet weak var lineEndingsLFItem: NSMenuItem?
   @IBOutlet weak var lineEndingsCRLFItem: NSMenuItem?
   @IBOutlet weak var lineEndingsCRItem: NSMenuItem?
-  @IBOutlet weak var fileFromClipboardItem: NSMenuItem?
+  @IBOutlet weak var fileNewTabItem: NSMenuItem?
+  @IBOutlet weak var fileReopenClosedTabItem: NSMenuItem?
   @IBOutlet weak var editUndoItem: NSMenuItem?
   @IBOutlet weak var editRedoItem: NSMenuItem?
   @IBOutlet weak var editPasteItem: NSMenuItem?
   @IBOutlet weak var editGotoLineItem: NSMenuItem?
+  @IBOutlet weak var editWritingToolsItem: NSMenuItem?
   @IBOutlet weak var editReadOnlyItem: NSMenuItem?
   @IBOutlet weak var editStatisticsItem: NSMenuItem?
   @IBOutlet weak var editTypewriterItem: NSMenuItem?
@@ -56,11 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var settingsWindowController: NSWindowController?
 
   func applicationWillFinishLaunching(_ notification: Notification) {
+    NSApp.appearance = AppPreferences.General.appearance.resolved()
     EditorPreloader.shared.warmUp()
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    NSApp.appearance = AppPreferences.General.appearance.resolved()
+    AppDesign.migrateMainMenuIcons(delegate: self)
     appearanceObservation = NSApp.observe(\.effectiveAppearance) { _, _ in
       Task { @MainActor in
         AppTheme.current.updateAppearance()
@@ -71,6 +75,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       self,
       selector: #selector(windowDidResignKey(_:)),
       name: NSWindow.didResignKeyNotification,
+      object: nil
+    )
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(extensionsMenuNeedsUpdate(_:)),
+      name: .extensionsMenuNeedsUpdate,
       object: nil
     )
 
@@ -97,6 +108,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         await AppUpdater.checkForUpdates(explicitly: false)
       }
 
+      Task {
+        await ExtensionUpdater.checkForUpdates()
+      }
+
       DispatchQueue.global(qos: .utility).async {
         let defaults = UserDefaults.standard.dictionaryRepresentation()
         let plist = defaults.merging(AppRuntimeConfig.jsonObject) { _, rhs in rhs }
@@ -113,6 +128,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
       Task {
         await EditorSelectionHistory.purgeStaleEntries()
+      }
+    }
+
+    // Wake daily so background catalog refresh and update prompts can run while the app stays open.
+    Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { _ in
+      Task {
+        await ExtensionUpdater.checkForUpdates()
       }
     }
 
@@ -153,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate {
   func application(_ application: NSApplication, open urls: [URL]) {
     for url in urls {
-      // https://github.com/MarkEdit-app/MarkEdit/wiki/Text-Processing#using-url-schemes
+      // https://github.com/MarkEdit-app/MarkEdit/wiki/Manual#using-url-schemes
       let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
       switch components?.host {
       case "new-file":
@@ -162,6 +184,9 @@ extension AppDelegate {
       case "open":
         // markedit://open or markedit://open?path=Untitled.md
         openFile(queryDict: components?.queryDict)
+      case "install-extension":
+        // markedit://install-extension?id=markedit-preview or ?url=https://...
+        ExtensionInstaller.install(queryDict: components?.queryDict)
       default:
         break
       }
@@ -169,31 +194,30 @@ extension AppDelegate {
   }
 }
 
-// MARK: - NSMenuItemValidation
-
-extension AppDelegate: NSMenuItemValidation {
-  func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-    if menuItem.action == #selector(reopenClosedTab(_:)) {
-      return EditorClosedTabHistory.shared.hasEntries
-    }
-
-    return true
-  }
-}
-
 // MARK: - Private
 
 private extension AppDelegate {
   @objc func windowDidResignKey(_ notification: Notification) {
-    // To reduce the glitches between switching windows,
-    // close openPanel once we don't have any key windows.
+    // [AppKit quirk] Leaving NSOpenPanel up across app switches causes a visible
+    // flash the next time the panel is shown (e.g. via Dock > Recent Documents).
+    // TextEdit has the same glitch. Closing it on deactivation avoids the flicker.
     //
     // Delay because there's no keyWindow during window transitions.
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+      // Skip transient resign-key events where the app stays active,
+      // such as the Dock icon's right-click menu.
+      guard !NSApp.isActive else {
+        return
+      }
+
       if NSApp.windows.allSatisfy({ !$0.isKeyWindow }) {
         NSApp.closeOpenPanels()
       }
     }
+  }
+
+  @objc func extensionsMenuNeedsUpdate(_ notification: Notification) {
+    updateExtensionsMenu()
   }
 
   @IBAction func showPreferences(_ sender: Any?) {
@@ -216,5 +240,16 @@ private extension AppDelegate {
 
   @IBAction func openSettingsJSON(_ sender: Any?) {
     NSWorkspace.shared.open(AppCustomization.settings.fileURL)
+  }
+
+  func updateExtensionsMenu() {
+    guard let menu = mainExtensionsMenu else {
+      return Logger.assertFail("Failed to get mainExtensionsMenu")
+    }
+
+    let badgeText = "✨ "
+    let originalText = menu.title.replacingOccurrences(of: badgeText, with: "")
+    let showsBadge = ExtensionRegistry.hasCachedUpdates || !AppPreferences.Extensions.windowHasBeenOpened
+    menu.title = "\(showsBadge ? badgeText : "")\(originalText)"
   }
 }

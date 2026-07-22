@@ -5,6 +5,7 @@
 //  Created by cyan on 12/12/22.
 
 import AppKit
+import AppKitExtensions
 import MarkEditKit
 import FileVersion
 import TextBundle
@@ -385,7 +386,11 @@ extension EditorDocument {
     }
 
     Task { @MainActor in
-      try await super.autosave(withImplicitCancellability: implicitlyCancellable)
+      do {
+        try await super.autosave(withImplicitCancellability: implicitlyCancellable)
+      } catch {
+        Logger.log(.error, "Failed to autosave: \(error)")
+      }
     }
   }
 
@@ -440,8 +445,13 @@ extension EditorDocument {
     // Support extension-less paths by bypassing file type validation
     if inputExtension.isEmpty {
       Task { @MainActor in
-        try await save(to: fileURL.deletingPathExtension(), ofType: "", for: .saveOperation)
+        do {
+          try await save(to: fileURL.deletingPathExtension(), ofType: "", for: .saveOperation)
+        } catch {
+          Logger.log(.error, "Failed to handle save: \(error)")
+        }
       }
+
       return nil
     }
 

@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import ExtensionCore
+import MarkEditCore
 import MarkEditKit
 
 /**
@@ -23,13 +25,7 @@ struct AppCustomization {
     case pandoc
     case statisticsRules
     case settings
-
-    var tagName: String? {
-      switch self {
-      case .editorStyle, .stylesDirectory: return "style"
-      case .editorScript, .scriptsDirectory, .debugDirectory, .pandoc, .settings, .statisticsRules: return nil
-      }
-    }
+    case extensions
 
     var fileName: String {
       switch self {
@@ -41,6 +37,7 @@ struct AppCustomization {
       case .pandoc: return "pandoc.yaml"
       case .statisticsRules: return "statistics-rules.json"
       case .settings: return "settings.json"
+      case .extensions: return "extensions.json"
       }
     }
 
@@ -60,6 +57,7 @@ struct AppCustomization {
   static let pandoc = Self(fileType: .pandoc)
   static let statisticsRules = Self(fileType: .statisticsRules)
   static let settings = Self(fileType: .settings)
+  static let extensions = Self(fileType: .extensions)
 
   static func createFiles() {
     editorStyle.createFile()
@@ -70,6 +68,7 @@ struct AppCustomization {
     pandoc.createFile("from: gfm\nstandalone: true\npdf-engine: context\n")
     statisticsRules.createFile("[]")
     settings.createFile(AppRuntimeConfig.defaultContents)
+    extensions.createFile(ExtensionConfig.defaultContents)
   }
 
   var fileURL: URL {
@@ -83,23 +82,16 @@ struct AppCustomization {
     createContents(url: fileURL) ?? ""
   }
 
-  var directoryContents: [String] {
-    let files = (try? FileManager.default.contentsOfDirectory(
-      at: fileURL,
-      includingPropertiesForKeys: nil
-    )) ?? []
+  func styleContents() -> [String] {
+    fileURL.sortedFiles(types: ["css"])
+      .compactMap { createContents(url: $0.resolvingSymbolicLink) }
+  }
 
-    let sorted = files.sorted {
-      $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
-    }
-
-    return sorted.compactMap {
-      guard ["css", "js"].contains($0.pathExtension.lowercased()) else {
-        return nil
-      }
-
-      return createContents(url: $0.resolvingSymbolicLink)
-    }
+  func contentsFrom(fileNames: [String]) -> [String] {
+    fileNames
+      .filter { isSafeFileName($0) }
+      .map { fileURL.appending(path: $0, directoryHint: .notDirectory).resolvingSymbolicLink }
+      .compactMap { createContents(url: $0) }
   }
 
   // MARK: - Private
@@ -130,19 +122,19 @@ struct AppCustomization {
       return nil
     }
 
-    // Create a label to better identify loaded contents
-    let comment = " /* \(url.lastPathComponent) */"
-
-    // JavaScript, create a closure to avoid declaration conflict
-    if fileType == .editorScript || fileType == .scriptsDirectory {
-      return "(() => {\(comment)\nmodule = typeof module === 'object' ? module : { exports: {} };\nexports = module.exports;\n\n\(contents)\n})();"
+    switch fileType {
+    case .editorScript, .scriptsDirectory:
+      return EditorUserAsset.script(for: url, contents: contents)
+    case .editorStyle, .stylesDirectory:
+      return EditorUserAsset.style(for: url, contents: contents)
+    default:
+      return contents
     }
+  }
 
-    // Stylesheet, create a <style></style> element
-    if let tagName = fileType.tagName {
-      return "<\(tagName)>\(comment)\n\(contents)\n</\(tagName)>"
-    }
-
-    return contents
+  /// Whether `name` is a plain file name that stays inside its directory,
+  /// guarding against path traversal from hand-edited config entries.
+  private func isSafeFileName(_ name: String) -> Bool {
+    !name.isEmpty && name != "." && name != ".." && name == (name as NSString).lastPathComponent
   }
 }

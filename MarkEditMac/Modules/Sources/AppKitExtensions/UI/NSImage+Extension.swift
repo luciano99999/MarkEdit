@@ -5,8 +5,13 @@
 //
 
 import AppKit
+import SwiftUI
 
 public extension NSImage {
+  convenience init?(systemSymbolName: String) {
+    self.init(systemSymbolName: systemSymbolName, accessibilityDescription: nil)
+  }
+
   static func with(
     symbolName: String,
     pointSize: Double,
@@ -14,7 +19,7 @@ public extension NSImage {
     accessibilityLabel: String? = nil
   ) -> NSImage {
     let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityLabel)
-    let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+    let config = Self.SymbolConfiguration(pointSize: pointSize, weight: weight)
 
     guard let image = image?.withSymbolConfiguration(config) else {
       assertionFailure("Failed to create image with symbol \"\(symbolName)\"")
@@ -43,5 +48,23 @@ public extension NSImage {
     }
 
     perform(sel_getUid("_setTintColor:"), with: tintColor)
+  }
+}
+
+public extension Image {
+  static func alwaysVisibleSymbol(named symbolName: String) -> Self {
+    guard #available(macOS 27.0, *) else {
+      return Self(systemName: symbolName)
+    }
+
+    guard let image = NSImage(systemSymbolName: symbolName) else {
+      assertionFailure("Failed to create image with symbol \"\(symbolName)\"")
+      return Self(systemName: symbolName)
+    }
+
+    // [macOS 27] FB23544345 SwiftUI lack of support for preferred image visibility
+    let redrawn = image.resized(with: image.size)
+    redrawn.isTemplate = true
+    return Self(nsImage: redrawn)
   }
 }

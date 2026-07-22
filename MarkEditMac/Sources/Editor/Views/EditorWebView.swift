@@ -70,8 +70,7 @@ final class EditorWebView: WKWebView {
 
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
     // Silence the incorrect "beep" in WebKit
-    if event.modifierFlags.contains([.control, .command]),
-       event.keyCode == .kVK_LeftArrow || event.keyCode == .kVK_RightArrow {
+    if event.modifierFlags.contains([.control, .command]), arrowKeyCodes.contains(event.keyCode) {
       // Event will be handled in CoreEditor instead
       return false
     }
@@ -108,6 +107,11 @@ final class EditorWebView: WKWebView {
       return true
     }
 
+    // Always enable "Show Writing Tools"
+    if #available(macOS 27.0, *), AppDesign.forceWritingTools {
+      AppWritingTools.ensureWritingTools(menu: menu, target: self)
+    }
+
     // Actions like select all in selection, replace all in selection, etc
     if let searchMenuItem = actionDelegate?.editorWebViewSearchActionsMenuItem(self) {
       menu.insertItem(searchMenuItem, at: 0)
@@ -127,8 +131,8 @@ final class EditorWebView: WKWebView {
     )
 
     if AppDesign.menuIconEvolution {
-      findSelectionItem.image = NSImage(systemSymbolName: "text.page.badge.magnifyingglass", accessibilityDescription: nil)
-      selectAllOccurrencesItem.image = NSImage(systemSymbolName: "selection.pin.in.out", accessibilityDescription: nil)
+      findSelectionItem.image = NSImage(systemSymbolName: "text.page.badge.magnifyingglass")
+      selectAllOccurrencesItem.image = NSImage(systemSymbolName: "selection.pin.in.out")
     }
 
     // Only add text format items when it's not read-only
@@ -138,7 +142,7 @@ final class EditorWebView: WKWebView {
       item.submenu = NSApp.appDelegate?.textFormatMenu?.copiedMenu
 
       if AppDesign.menuIconEvolution {
-        item.image = NSImage(systemSymbolName: "bold.italic.underline", accessibilityDescription: nil)
+        item.image = NSImage(systemSymbolName: "bold.italic.underline")
       }
 
       menu.addItem(item)
@@ -211,7 +215,7 @@ private extension EditorWebView {
           item.keyEquivalentModifierMask = [.option, .command]
 
           if AppDesign.menuIconEvolution {
-            item.image = NSImage(systemSymbolName: "ladybug", accessibilityDescription: nil)
+            item.image = NSImage(systemSymbolName: "ladybug")
           }
         }
 
@@ -264,3 +268,10 @@ private extension NSUserInterfaceItemIdentifier {
   static let shareMenu = Self("WKMenuItemIdentifierShareMenu")
   static let inspectElement = Self("WKMenuItemIdentifierInspectElement")
 }
+
+private let arrowKeyCodes: [UInt16] = [
+  .kVK_LeftArrow,
+  .kVK_RightArrow,
+  .kVK_DownArrow,
+  .kVK_UpArrow,
+]

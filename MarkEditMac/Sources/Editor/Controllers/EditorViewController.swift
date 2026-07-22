@@ -5,8 +5,9 @@
 //  Created by cyan on 12/12/22.
 
 import AppKit
-import AppKitControls
+import SharedUI
 import WebKit
+import ExtensionCore
 import MarkEditCore
 import MarkEditKit
 import Statistics
@@ -28,7 +29,6 @@ final class EditorViewController: NSViewController {
   var pendingResetCount: Int = 0
   var webBackgroundColor = AppPreferences.Window.cachedBackgroundColor?.nsColor
   var localEventMonitor: Any?
-  var textBoxInputObserver: Any?
   var safeAreaObservation: NSKeyValueObservation?
   var userDefinedMenuItems = [EditorMenuItem]()
 
@@ -85,10 +85,9 @@ final class EditorViewController: NSViewController {
     return findPanel.isFirstResponder || replacePanel.isFirstResponder
   }
 
-  // Custom views to apply modern effects (either glass or blur) to the title bar
+  // Custom views to apply blur effects to the title bar
   let modernBackgroundView = NSView()
-  let modernEffectView = AppDesign.modernEffectView.init()
-  let modernTintedView = NSView()
+  let modernEffectView = MaterialView()
   let modernDividerView = DividerView()
 
   // Height constraint of the effect view, depending on the panel state
@@ -143,7 +142,7 @@ final class EditorViewController: NSViewController {
 
     let scripts = [
       AppCustomization.editorScript.fileContents,
-    ] + AppCustomization.scriptsDirectory.directoryContents
+    ] + AppCustomization.scriptsDirectory.contentsFrom(fileNames: ExtensionConfig.enabledFileNames)
 
     scripts.forEach {
       controller.addUserScript(WKUserScript(
@@ -187,7 +186,7 @@ final class EditorViewController: NSViewController {
       let html = [
         AppPreferences.editorConfig(theme: theme).toHtml,
         AppCustomization.editorStyle.fileContents,
-        AppCustomization.stylesDirectory.directoryContents.joined(separator: "\n"),
+        AppCustomization.stylesDirectory.styleContents().joined(separator: "\n"),
       ].joined(separator: "\n\n")
 
       DispatchQueue.main.async {
@@ -234,8 +233,8 @@ final class EditorViewController: NSViewController {
   private var writingToolsObservation: NSKeyValueObservation?
 
   // For CoreEditor preload
-  private var loadingContinuations = [CheckedContinuation<Void, Never>]()
-  private var resetContinuations = [CheckedContinuation<Void, Never>]()
+  private var loadingContinuations = [PreloadContinuation]()
+  private var resetContinuations = [PreloadContinuation]()
 
   deinit {
     if let monitor = localEventMonitor {
@@ -327,23 +326,33 @@ final class EditorViewController: NSViewController {
 // MARK: - Exposed Methods
 
 extension EditorViewController {
+  /**
+   Wait until the editor finishes loading, or timeout after 1.5 seconds.
+
+   Callers must tolerate returning while `hasFinishedLoading` is still false.
+   */
   func waitUntilLoaded() async {
     if hasFinishedLoading {
       return
     }
 
     await withCheckedContinuation {
-      loadingContinuations.append($0)
+      loadingContinuations.append(.init($0))
     }
   }
 
+  /**
+   Wait until the editor reset completes, or timeout after 1.5 seconds.
+
+   Callers must tolerate returning while `pendingResetCount > 0`.
+   */
   func waitUntilEditorReset() async {
     guard pendingResetCount > 0 else {
       return
     }
 
     await withCheckedContinuation {
-      resetContinuations.append($0)
+      resetContinuations.append(.init($0))
     }
   }
 
@@ -432,5 +441,28 @@ extension EditorViewController {
 
   func ensureWritingToolsSelectionRect() {
     bridge.writingTools.ensureSelectionRect()
+  }
+}
+
+/**
+ Continuation wrapper for managing the lifecycle of a preload operation.
+ */
+private final class PreloadContinuation {
+  private var continuation: CheckedContinuation<Void, Never>?
+
+  init(_ continuation: CheckedContinuation<Void, Never>, timeout: TimeInterval = 1.5) {
+    self.continuation = continuation
+
+    if timeout > 0 {
+      Task { @MainActor in
+        try? await Task.sleep(for: .seconds(timeout))
+        resume()
+      }
+    }
+  }
+
+  func resume() {
+    continuation?.resume()
+    continuation = nil
   }
 }

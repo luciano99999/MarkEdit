@@ -24,12 +24,14 @@ public struct EditorConfig: Encodable {
   let lineHeight: Double
   let suggestWhileTyping: Bool
   let standardDirectories: [String: String]
+  let runtimeInfo: RuntimeInfo?
   let defaultLineBreak: String?
   let tabKeyBehavior: Int?
   let indentUnit: String?
   let localizable: EditorLocalizable?
   let autoCharacterPairs: Bool
   let indentBehavior: EditorIndentBehavior
+  let undoGroupingInterval: Double?
   let headerFontSizeDiffs: [Double]?
   let visibleWhitespaceCharacter: String?
   let visibleLineBreakCharacter: String?
@@ -50,12 +52,14 @@ public struct EditorConfig: Encodable {
     lineHeight: Double,
     suggestWhileTyping: Bool,
     standardDirectories: [String: String],
+    runtimeInfo: RuntimeInfo?,
     defaultLineBreak: String?,
     tabKeyBehavior: Int?,
     indentUnit: String?,
     localizable: EditorLocalizable?,
     autoCharacterPairs: Bool,
     indentBehavior: EditorIndentBehavior,
+    undoGroupingInterval: Double?,
     headerFontSizeDiffs: [Double]?,
     visibleWhitespaceCharacter: String?,
     visibleLineBreakCharacter: String?,
@@ -75,12 +79,14 @@ public struct EditorConfig: Encodable {
     self.lineHeight = lineHeight
     self.suggestWhileTyping = suggestWhileTyping
     self.standardDirectories = standardDirectories
+    self.runtimeInfo = runtimeInfo
     self.defaultLineBreak = defaultLineBreak
     self.tabKeyBehavior = tabKeyBehavior
     self.indentUnit = indentUnit
     self.localizable = localizable
     self.autoCharacterPairs = autoCharacterPairs
     self.indentBehavior = indentBehavior
+    self.undoGroupingInterval = undoGroupingInterval
     self.headerFontSizeDiffs = headerFontSizeDiffs
     self.visibleWhitespaceCharacter = visibleWhitespaceCharacter
     self.visibleLineBreakCharacter = visibleLineBreakCharacter

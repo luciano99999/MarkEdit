@@ -8,6 +8,7 @@ import { setUp, setTheme } from '../styling/config';
 import { classHighlighters, markdownExtensions, renderExtensions } from '../styling/markdown';
 import { linkStyles } from '../styling/nodes/link';
 import { scrollIntoView } from '../modules/selection';
+import { enablePinchZoom, PinchZoomBridge } from '../zoom';
 
 import GitHubLight from '../styling/themes/github-light';
 import GitHubDark from '../styling/themes/github-dark';
@@ -19,6 +20,14 @@ window.config = config;
 
 const theme = new Compartment;
 window.dynamics = { theme };
+
+// Drive the theme from the system color scheme; the preview extension has no other source
+const colorSchemeQuery = matchMedia('(prefers-color-scheme: dark)');
+const initialTheme = preferredTheme();
+
+colorSchemeQuery.addEventListener('change', () => {
+  setTheme(preferredTheme());
+});
 
 const extensions = [
   // Basic
@@ -38,7 +47,7 @@ const extensions = [
 
   // Styling
   classHighlighters,
-  theme.of(loadTheme(config.theme)),
+  theme.of(initialTheme),
   renderExtensions,
   linkStyles,
 ];
@@ -47,7 +56,7 @@ const doc = config.text;
 const parent = document.querySelector('#editor') ?? document.body;
 
 window.editor = new EditorView({ doc, parent, extensions });
-setUp(config, loadTheme(config.theme).colors);
+setUp(config, initialTheme.colors);
 
 // Makes sure the content doesn't have unwanted inset
 scrollIntoView(0);
@@ -58,12 +67,9 @@ scrollIntoView(0);
 const bridge = window as any;
 const storage: { scrollbarOffset?: number } = {};
 
-bridge.setTheme = (name: string) => {
-  setTheme(loadTheme(name));
-};
-
-bridge.startDragging = (location: number) => {
+bridge.startDragging = (original: number) => {
   // scrollbarOffset is the distance between the top of the scrollbar and the mouse location
+  const location = convertToLocal(original);
   const { scrollbarTop, scrollbarHeight } = scrollerGeometryValues();
   storage.scrollbarOffset = location - scrollbarTop;
 
@@ -77,7 +83,7 @@ bridge.startDragging = (location: number) => {
 
 bridge.updateDragging = (location: number) => {
   if (storage.scrollbarOffset !== undefined) {
-    scrollToMouseLocation(location, storage.scrollbarOffset);
+    scrollToMouseLocation(convertToLocal(location), storage.scrollbarOffset);
   }
 };
 
@@ -85,14 +91,15 @@ bridge.cancelDragging = () => {
   storage.scrollbarOffset = undefined;
 };
 
-// There're only two themes in the preview extension,
-// use a simplified "loadTheme" to avoid bundling unused themes.
-function loadTheme(name: string) {
-  if (name === 'github-dark') {
-    return GitHubDark();
-  } else {
-    return GitHubLight();
-  }
+// Zoom in and out using the trackpad
+enablePinchZoom(bridge as PinchZoomBridge);
+
+function preferredTheme() {
+  return colorSchemeQuery.matches ? GitHubDark() : GitHubLight();
+}
+
+function scrollerElement(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('.cm-scroller');
 }
 
 function scrollToMouseLocation(location: number, scrollbarOffset: number, behavior: ScrollBehavior = 'auto') {
@@ -100,17 +107,25 @@ function scrollToMouseLocation(location: number, scrollbarOffset: number, behavi
   // we need to take the initial scrollbar offset into account.
   const { clientHeight, scrollHeight, scrollbarHeight } = scrollerGeometryValues();
   const percentage = (location - scrollbarOffset) / (clientHeight - scrollbarHeight);
-  window.scrollTo({
+  (scrollerElement() ?? document.documentElement).scrollTo({
     top: percentage * (scrollHeight - clientHeight),
     behavior,
   });
 }
 
+/**
+ * Convert the viewport Y coordinate to the local coordinate relative to the scroller's top.
+ */
+function convertToLocal(viewportY: number): number {
+  const scroller = scrollerElement();
+  return scroller === null ? viewportY : viewportY - scroller.getBoundingClientRect().top;
+}
+
 function scrollerGeometryValues() {
-  const container = document.documentElement;
+  const container = scrollerElement() ?? document.documentElement;
   const clientHeight = container.clientHeight;
   const scrollHeight = container.scrollHeight;
-  const scrollbarHeight = clientHeight * (clientHeight / container.offsetHeight);
+  const scrollbarHeight = clientHeight * (clientHeight / scrollHeight);
 
   const progress = container.scrollTop / (container.scrollHeight - clientHeight);
   const scrollbarTop = progress * (clientHeight - scrollbarHeight);
