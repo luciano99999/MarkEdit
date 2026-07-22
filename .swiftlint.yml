@@ -1,6 +1,7 @@
 excluded:
   - MarkEditMac/Modules/.build
   - MarkEditKit/Sources/Bridge/Native/Generated
+  - BuildOutput
 
 disabled_rules:
 
