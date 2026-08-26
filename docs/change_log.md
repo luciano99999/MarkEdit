@@ -6,14 +6,16 @@
 **Work Done**:
 - **Aggiornamento Upstream**: Eseguito il merge dei commit upstream (73 nuovi commit) da `origin/main` (tag **v1.34.0**) nel branch `feature/italian-localization`.
 - **Risoluzione Conflitti & Localizzazione**: Risolti i conflitti di merge nei cataloghi `.xcstrings` preservando tutte le traduzioni e aggiungendo le nuove stringhe in italiano (25 nuove chiavi totali tra `Localizable.xcstrings`, `Main.xcstrings` e `QuickLookMac/Localizable.xcstrings`), raggiungendo il **100%** di copertura per le nuove funzionalità (Extension Manager, In-app Updater, Quick Look, Modalità sicura).
+- **Fix Bundle CoreEditor (Inline HTML)**: Nella versione 1.34.0 l'architettura frontend è passata dal chunk loading al singlefile inline HTML. Eseguito `yarn install` e `yarn build` in `CoreEditor` per generare il bundle completo `dist/index.html` (risolvendo il problema della schermata nera all'apertura dei file Markdown).
 - **Build & Installazione**: Compilata l'applicazione sia in `Debug` che in `Release` con successo ed installata la nuova build **MarkEdit v1.34.0** in `/Applications/MarkEdit.app`.
 
 **Key Changes**:
 - Integrazione completa del nuovo Extension Manager con ricerca e installazione estensioni/temi, nuovo In-app Updater e nuovo modulo Quick Look.
 - Copertura di localizzazione italiana al 100% per tutte le 466 stringhe complessive dell'app.
+- Ricompilato il motore CodeMirror / CoreEditor con il nuovo formato singlefile HTML.
 
 **Outcome**:
-- MarkEdit.app v1.34.0 installato in `/Applications/` e funzionante in italiano.
+- MarkEdit.app v1.34.0 installato in `/Applications/`, editor funzionante e interfaccia in italiano.
 
 ## 2026-07-22
 **Session**: Aggiornamento alla versione v1.33.1 (Conversation ID: 0a95585e-6420-43d9-9097-36553dbfa08e)
