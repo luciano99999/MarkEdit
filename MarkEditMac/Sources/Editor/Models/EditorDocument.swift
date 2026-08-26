@@ -243,9 +243,12 @@ extension EditorDocument {
 
   override func canClose(withDelegate delegate: Any, shouldClose shouldCloseSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
     let isNewFile = fileURL == nil
+    let confirmsChanges = #selector(confirmsChanges(_:shouldClose:contextInfo:))
+    let canHandleConfirmation = (delegate as? NSObject)?.responds(to: confirmsChanges) == true
+
     let shouldClose: Selector? = {
-      if !isNewFile && !isTerminating && closeAlwaysConfirmsChanges {
-        return #selector(confirmsChanges(_:shouldClose:))
+      if !isNewFile && !isTerminating && closeAlwaysConfirmsChanges && canHandleConfirmation {
+        return confirmsChanges
       }
 
       return shouldCloseSelector
@@ -281,12 +284,15 @@ extension EditorDocument {
   }
 
   override func close() {
-    saveToClosedTabHistory()
-    super.close()
+    if !isTerminating {
+      saveToClosedTabHistory()
+    }
 
     if let spellDocTag {
       NSSpellChecker.shared.closeSpellDocument(withTag: spellDocTag)
     }
+
+    super.close()
   }
 
   override func writableTypes(for saveOperation: NSDocument.SaveOperationType) -> [String] {
@@ -381,17 +387,12 @@ extension EditorDocument {
     //
     // To work around this, check a flag to save the document manually.
     if !hasBeenReverted && isTerminating && hasUnautosavedChanges, let fileURL, let fileType {
-      try? writeSafely(to: fileURL, ofType: fileType, for: .autosaveAsOperation)
+      try writeSafely(to: fileURL, ofType: fileType, for: .autosaveAsOperation)
       fileModificationDate = .now // Prevent immediate presentedItemDidChange calls
+      return
     }
 
-    Task { @MainActor in
-      do {
-        try await super.autosave(withImplicitCancellability: implicitlyCancellable)
-      } catch {
-        Logger.log(.error, "Failed to autosave: \(error)")
-      }
-    }
+    try await super.autosave(withImplicitCancellability: implicitlyCancellable)
   }
 
   override func data(ofType typeName: String) throws -> Data {
@@ -533,14 +534,16 @@ extension EditorDocument: FileVersionPickerDelegate {
     hostViewController?.presentAsSheet(picker)
   }
 
-  func fileVersionPicker(_ picker: FileVersionPicker, didPickVersion version: NSFileVersion) {
+  func fileVersionPicker(_ picker: FileVersionPicker, didPickVersion version: NSFileVersion) async {
     guard let contents = try? Data(contentsOf: version.url).toString() else {
       return Logger.assertFail("Failed to get file contents of version: \(version)")
     }
 
     stringValue = contents
     hostViewController?.resetEditor()
-    saveContent()
+
+    await hostViewController?.waitUntilEditorReset()
+    await waitUntilSaveCompleted()
   }
 
   func fileVersionPicker(_ picker: FileVersionPicker, didBecomeSheet: Bool) {
@@ -565,8 +568,15 @@ extension EditorDocument {
       return try super.write(to: url, ofType: typeName)
     }
 
-    let fileWrapper = try? textBundle?.fileWrapper(with: try data(ofType: typeName))
-    try fileWrapper?.write(to: url, originalContentsURL: nil)
+    guard let textBundle else {
+      Logger.assertFail("Missing textBundle for document: \(self)")
+      throw CocoaError(.fileWriteUnknown, userInfo: [
+        NSLocalizedDescriptionKey: "Unable to save as TextBundle, file wrapper is missing."
+      ])
+    }
+
+    let fileWrapper = try textBundle.fileWrapper(with: try data(ofType: typeName))
+    try fileWrapper.write(to: url, originalContentsURL: nil)
   }
 
   override func duplicate() throws -> NSDocument {
@@ -678,7 +688,11 @@ private extension EditorDocument {
     bridge?.history.markContentClean()
   }
 
-  @objc func confirmsChanges(_ document: EditorDocument, shouldClose: Bool) {
+  @objc func confirmsChanges(
+    _ document: EditorDocument,
+    shouldClose: Bool,
+    contextInfo: UnsafeMutableRawPointer?
+  ) {
     guard shouldClose else {
       return // Cancelled
     }

@@ -9,7 +9,7 @@ import normalizeSelection from './modules/selection/normalizeSelection';
 import replaceSelections from './modules/commands/replaceSelections';
 
 import { resetKeyStates } from './modules/events';
-import { setUp, setGutterHovered, applyReducedMotion, setShowActiveLineIndicator } from './styling/config';
+import { setUp, setGutterHovered, applyReducedMotion } from './styling/config';
 import { notifyBackgroundColor } from './styling/helper';
 import { loadTheme } from './styling/themes';
 import { recalculateTextMetrics } from './modules/config';
@@ -22,7 +22,7 @@ import { markContentClean } from './modules/history';
 import { updateTextChecker } from './modules/textChecker';
 
 import { TextEditor } from './api/editor';
-import { editorReadyListeners } from './api/methods';
+import { notifyEditorReady } from './api/methods';
 
 // Work around a WebKit bug, text jiggles back and forth when resizing the window
 window.addEventListener('resize', () => tryGetEditor()?.requestMeasure());
@@ -84,6 +84,9 @@ export async function resetEditor(
   const initialDoc = normalizeLineBreaks(initialContent, lineBreak);
   const initialSelection = normalizeSelection(initialDoc.length, selectionRange);
   const selectionRestored = selectionRange !== undefined && (selectionRange.anchor !== 0 || selectionRange.head !== 0);
+
+  // Honest flag, set before the view so extensions don't need an extra reconfigure pass
+  editingState.hasSelection = !initialSelection.empty;
 
   tryGetEditor()?.destroy();
   window.editor = new EditorView({
@@ -159,16 +162,12 @@ export async function resetEditor(
     });
   }
 
-  // Honest flag: selection may be non-empty after restoration
-  editingState.hasSelection = hasSelection();
+  // A brand-new view can never be mid-composition, drop the state left by the old one
+  editingState.compositionEnded = true;
+  editingState.compositionPosition = undefined;
 
   // Reconfigure, window.config might have changed
   setUp(window.config, loadTheme(window.config.theme).colors);
-
-  // Mirror the selection-change path for restored non-empty selections
-  if (editingState.hasSelection && window.config.showActiveLineIndicator) {
-    setShowActiveLineIndicator(false);
-  }
 
   applyReducedMotion(isMotionReduced());
   observeBackgroundColorChanges(editor.dom);
@@ -193,7 +192,7 @@ export async function resetEditor(
   markContentClean();
 
   // For user scripts, notify the editor is ready
-  editorReadyListeners().forEach(listener => listener(editor));
+  notifyEditorReady(editor);
 
   // Wait for the first paint: rAF when foregrounded, setTimeout as a fallback when throttled
   await new Promise<void>(resolve => {

@@ -2,7 +2,7 @@ import { EditorView, keymap } from '@codemirror/view';
 import { EditorSelection, EditorState, Prec } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { startCompletion as startTooltipCompletion, closeCompletion as closeTooltipCompletion, completionStatus as tooltipCompletionStatus, CompletionContext, CompletionResult, insertCompletionText, pickedCompletion, Completion, autocompletion, completionKeymap } from '@codemirror/autocomplete';
-import { editingState } from '../../common/store';
+import { isComposing } from '../../common/store';
 import { anchorAtPos } from '../tokenizer/anchorAtPos';
 import { getFootnoteLabels, getReferenceLinkLabels } from '../link';
 import { getLinkAnchor, getTableOfContents } from '../toc';
@@ -143,7 +143,7 @@ export const referenceLinkCompletion = {
  *
  * Note that, "afterDelay" is used typically for "suggest while typing" scenario.
  */
-export function startCompletion({ afterDelay }: { afterDelay: number }) {
+export function startCompletion({ afterDelay, userInitiated } = { afterDelay: 0, userInitiated: true }) {
   if (storage.cancellable !== undefined) {
     clearTimeout(storage.cancellable);
   }
@@ -153,7 +153,7 @@ export function startCompletion({ afterDelay }: { afterDelay: number }) {
   storage.cancellable = setTimeout(() => {
     // We don't want to trigger completion when composition is still ongoing,
     // marked text in input methods like Pinyin is not meaningful until composition is ended.
-    if (!editingState.compositionEnded) {
+    if (isComposing()) {
       return;
     }
 
@@ -189,7 +189,7 @@ export function startCompletion({ afterDelay }: { afterDelay: number }) {
       }
     })();
 
-    window.nativeModules.completion.requestCompletions({ anchor, fullText });
+    window.nativeModules.completion.requestCompletions({ anchor, fullText, userInitiated });
   }, afterDelay);
 }
 
@@ -203,14 +203,6 @@ export function isPanelVisible() {
 
 export function hasTooltipCompletion() {
   return tooltipCompletionStatus(window.editor.state) === 'active';
-}
-
-export function toggleTooltipCompletion() {
-  if (hasTooltipCompletion()) {
-    closeTooltipCompletion(window.editor);
-  } else {
-    startTooltipCompletion(window.editor);
-  }
 }
 
 export function invalidateCache() {
@@ -240,6 +232,14 @@ export function acceptInlinePrediction(prediction: string) {
         selection: EditorSelection.cursor(from + prediction.length),
       });
     }
+  }
+}
+
+function toggleTooltipCompletion() {
+  if (hasTooltipCompletion()) {
+    closeTooltipCompletion(window.editor);
+  } else {
+    startTooltipCompletion(window.editor);
   }
 }
 

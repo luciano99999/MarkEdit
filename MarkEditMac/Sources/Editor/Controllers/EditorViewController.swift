@@ -26,7 +26,7 @@ final class EditorViewController: NSViewController {
   var mouseExitedWindow = false
   var nativeSearchQueryChanged = false
   var bottomPanelHeight: Double = 0
-  var pendingResetCount: Int = 0
+  var pendingResetCount: Int = 1
   var webBackgroundColor = AppPreferences.Window.cachedBackgroundColor?.nsColor
   var localEventMonitor: Any?
   var safeAreaObservation: NSKeyValueObservation?
@@ -140,7 +140,7 @@ final class EditorViewController: NSViewController {
     let controller = WKUserContentController()
     controller.addScriptMessageHandler(handler, contentWorld: .page, name: "bridge")
 
-    let scripts = [
+    let scripts = AppCustomization.isSafeMode ? [] : [
       AppCustomization.editorScript.fileContents,
     ] + AppCustomization.scriptsDirectory.contentsFrom(fileNames: ExtensionConfig.enabledFileNames)
 
@@ -161,13 +161,14 @@ final class EditorViewController: NSViewController {
     config.applicationNameForUserAgent = "\(ProcessInfo.processInfo.userAgent) \(Bundle.main.userAgent)"
     config.allowsInlinePredictions = NSSpellChecker.InlineCompletion.webKitEnabled
 
-    let chunkLoader = EditorChunkLoader()
     let imageLoader = EditorImageLoader { [weak self] in
       self?.document?.baseURL
     }
 
-    config.setURLSchemeHandler(chunkLoader, forURLScheme: EditorChunkLoader.scheme)
-    config.setURLSchemeHandler(imageLoader, forURLScheme: EditorImageLoader.scheme)
+    config.setURLSchemeHandler(
+      imageLoader,
+      forURLScheme: EditorImageLoader.scheme
+    )
 
     // Respect user settings for Writing Tools behavior
     if #available(macOS 15.1, *), let writingToolsBehavior = AppRuntimeConfig.writingToolsBehavior {
@@ -183,18 +184,21 @@ final class EditorViewController: NSViewController {
 
     let theme = AppTheme.current.editorTheme
     DispatchQueue.global(qos: .userInitiated).async {
-      let html = [
-        AppPreferences.editorConfig(theme: theme).toHtml,
+      let styles = AppCustomization.isSafeMode ? [] : [
         AppCustomization.editorStyle.fileContents,
         AppCustomization.stylesDirectory.styleContents().joined(separator: "\n"),
-      ].joined(separator: "\n\n")
+      ]
+
+      let html = ([
+        EditorIndexHtml.fromAppBundle(
+          config: AppPreferences.editorConfig(theme: theme),
+          userSettings: AppRuntimeConfig.jsonLiteral
+        ),
+      ] + styles).joined(separator: "\n\n")
 
       DispatchQueue.main.async {
         // Non-nil baseURL is required by scenarios like opening local files
-        webView.loadHTMLString(
-          html.replacingOccurrences(of: "\"{{USER_SETTINGS}}\"", with: AppRuntimeConfig.jsonLiteral),
-          baseURL: EditorWebView.baseURL
-        )
+        webView.loadHTMLString(html, baseURL: EditorWebView.baseURL)
       }
     }
 
@@ -295,7 +299,7 @@ final class EditorViewController: NSViewController {
     if completionContext.isPanelVisible {
       cancelCompletion()
     } else {
-      bridge.completion.startCompletion(afterDelay: 0)
+      bridge.completion.startCompletion()
     }
   }
 
@@ -373,6 +377,10 @@ extension EditorViewController {
       return
     }
 
+    if lastResetDocumentID != nil {
+      pendingResetCount += 1
+    }
+
     let textContent = document.stringValue
     let documentID = ObjectIdentifier(document)
 
@@ -398,7 +406,6 @@ extension EditorViewController {
       webView.magnification = 1.0
     }
 
-    pendingResetCount += 1
     Task { @MainActor [weak self] in
       guard let self else {
         return

@@ -2,7 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { EditorColors, EditorTheme } from './types';
 import { Config, WebFontFace, InvisiblesBehavior } from '../config';
 import { globalState, editingState, styleSheets } from '../common/store';
-import { adjustGutterPositions } from '../modules/lines';
+import { observeGuttersWidth, adjustGutterPositions } from '../modules/lines';
 import { refreshEditFocus } from '../modules/selection';
 import { gutterExtensions } from './nodes/gutter';
 import { invisiblesExtension } from './nodes/invisible';
@@ -32,15 +32,15 @@ export function setUp(config: Config, colors: EditorColors) {
   setEditorColors(colors);
   setFontFace(config.fontFace);
   setFontSize(config.fontSize);
-  setInvisiblesBehavior(config.invisiblesBehavior);
   setTypewriterMode(config.typewriterMode);
-  setFocusMode(config.focusMode);
+  updateFocusModeStyle(config.focusMode);
   setLineHeight(config.lineHeight);
   setOverscrollBehavior(config.lineWrapping);
 
   if (config.showLineNumbers) {
     // Delay because when the window is resizing, the mouse can enter and leave gutters rapidly
     setTimeout(enableGutterHoverEffects, 500);
+    enableGuttersObserver();
   }
 }
 
@@ -52,19 +52,6 @@ export function setTheme(theme: EditorTheme) {
   setEditorColors(theme.colors);
 }
 
-export function setEditorColors(colors: EditorColors) {
-  if (styleSheets.accentColor === undefined) {
-    styleSheets.accentColor = createStyleSheet('.cm-md-header:not(.cm-md-quote) {}');
-  }
-
-  updateStyleSheet(styleSheets.accentColor, style => {
-    const cssColor = shadowableTextColor(colors.accent);
-    Object.keys(cssColor).forEach(key => style.setProperty(key, cssColor[key] as string));
-  });
-
-  globalState.colors = colors;
-}
-
 export function setFontFace(fontFace: WebFontFace) {
   if (styleSheets.fontFace === undefined) {
     styleSheets.fontFace = createStyleSheet('.cm-content, .cm-tooltip-autocomplete * {}');
@@ -74,23 +61,23 @@ export function setFontFace(fontFace: WebFontFace) {
     style.fontWeight = fontFace.weight ?? '';
     style.fontStyle = fontFace.style ?? '';
 
-    // If the desired font is ui-monospace, prefix it with the bundled SF Mono.
-    //
-    // The reason is that the system mono fonts don't work well with visible whitespaces,
-    // some glyphs are slightly cropped.
-    //
-    // The bundled SF Mono is in woff2 format, which has better compatibility.
-    const systemMono = 'SF Mono, ui-monospace';
-    const preferredFont = fontFace.family === 'ui-monospace' ? systemMono : fontFace.family;
-
-    const fontFamilies = [
-      preferredFont,
-      systemMono, 'monospace', 'Menlo',
-      'system-ui', 'Helvetica', 'Arial', 'sans-serif',
+    const fallbacks = [
+      'ui-monospace',
+      'monospace',
+      'Menlo',
+      'system-ui',
+      'Helvetica',
+      'Arial',
+      'sans-serif',
     ];
 
-    // Set is ordered, it can safely dedupe items without messing up the order
-    style.fontFamily = [...new Set(fontFamilies)].join(', ');
+    // The desired family goes first, followed by the fallbacks minus a possible duplicate
+    const fontFamilies = [
+      fontFace.family,
+      ...fallbacks.filter(family => family !== fontFace.family),
+    ];
+
+    style.fontFamily = fontFamilies.join(', ');
   });
 }
 
@@ -129,6 +116,7 @@ export function setShowLineNumbers(enabled: boolean) {
 
   if (enabled) {
     enableGutterHoverEffects();
+    enableGuttersObserver();
   }
 }
 
@@ -162,20 +150,7 @@ export function setFocusMode(enabled: boolean) {
     effects: window.dynamics.selectedLines?.reconfigure(enabled ? selectedLinesDecoration : []),
   });
 
-  if (styleSheets.focusMode === undefined) {
-    styleSheets.focusMode = createStyleSheet(`
-      .cm-line:not(.cm-selectedLineRange), .cm-gutterElement:not(.cm-activeLineGutter) {
-        opacity: 0.25;
-      }
-    `, false);
-
-    // The state is not initially correct without a focus refresh
-    if (enabled) {
-      afterDomUpdate(refreshEditFocus);
-    }
-  }
-
-  styleSheets.focusMode.disabled = !enabled;
+  updateFocusModeStyle(enabled);
 }
 
 export function setLineWrapping(enabled: boolean) {
@@ -235,8 +210,21 @@ export function applyReducedMotion(reduceMotion: boolean, types: 'both' | 'curso
   }
 }
 
+function setEditorColors(colors: EditorColors) {
+  if (styleSheets.accentColor === undefined) {
+    styleSheets.accentColor = createStyleSheet('.cm-md-header:not(.cm-md-quote) {}');
+  }
+
+  updateStyleSheet(styleSheets.accentColor, style => {
+    const cssColor = shadowableTextColor(colors.accent);
+    Object.keys(cssColor).forEach(key => style.setProperty(key, cssColor[key] as string));
+  });
+
+  globalState.colors = colors;
+}
+
 function enableGutterHoverEffects() {
-  const gutterDOM = document.querySelector('.cm-gutters') as HTMLElement | null;
+  const gutterDOM = tryGetGutters();
   if (gutterDOM === null) {
     return;
   }
@@ -267,6 +255,32 @@ function enableGutterHoverEffects() {
   applyReducedMotion(isMotionReduced(), 'gutter');
 }
 
+function enableGuttersObserver() {
+  const gutters = tryGetGutters();
+  if (gutters === null) {
+    return;
+  }
+
+  observeGuttersWidth(gutters);
+}
+
+function updateFocusModeStyle(enabled: boolean) {
+  if (styleSheets.focusMode === undefined) {
+    styleSheets.focusMode = createStyleSheet(`
+      .cm-line:not(.cm-selectedLineRange), .cm-gutterElement:not(.cm-activeLineGutter) {
+        opacity: 0.25;
+      }
+    `, false);
+
+    // The state is not initially correct without a focus refresh
+    if (enabled) {
+      afterDomUpdate(refreshEditFocus);
+    }
+  }
+
+  styleSheets.focusMode.disabled = !enabled;
+}
+
 function setOverscrollBehavior(enabled: boolean) {
   const behavior = enabled ? 'none' : '';
   document.documentElement.style.overscrollBehaviorX = behavior;
@@ -281,6 +295,10 @@ function createStyleSheet(styleText: string, enabled = true) {
   style.disabled = !enabled;
 
   return style;
+}
+
+function tryGetGutters() {
+  return document.querySelector('.cm-gutters') as HTMLElement | null;
 }
 
 const storage: {

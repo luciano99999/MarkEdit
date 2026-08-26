@@ -12,32 +12,55 @@ import SharedUI
 import SwiftUI
 import Observation
 
+/// A row to scroll to once it's listed, either the first of a category or an exact item.
+enum ExtensionsScrollTarget: Equatable {
+  case category(ExtensionEntry.Category)
+  case item(id: String)
+
+  func matches(_ item: ExtensionsModel.Item) -> Bool {
+    switch self {
+    case .category(let category): return item.category == category
+    case .item(let id): return item.id == id
+    }
+  }
+}
+
+@Observable
+@MainActor
+final class ExtensionsListInteraction {
+  var scrollGeneration = 0
+  var inlineUpdateItemIDs: Set<String> = []
+}
+
 /// Hosts the extension list in an AppKit `NSTableView` (SwiftUI cells) for native
 /// titlebar separators, drag-to-reorder, and row animations.
 @MainActor
 final class ExtensionsViewController: NSViewController {
-  static let defaultContentRect = {
-    if #available(macOS 26.0, *) {
-      return CGRect(x: 0, y: 0, width: 770, height: 580)
+  static let defaultContentRect = CGRect(x: 0, y: 0, width: 780, height: 580)
+
+  let model: ExtensionsModel
+  let scrollView = NSScrollView()
+  let tableView = NSTableView()
+  let listInteraction = ExtensionsListInteraction()
+  let rowMeasurer = TableCellWrapper.Measurer()
+
+  var displayedItems: [ExtensionsModel.Item] = [] {
+    didSet {
+      let displayedIDs = Set(displayedItems.map(\.id))
+      rowMetrics = rowMetrics.filter { displayedIDs.contains($0.key) }
     }
+  }
 
-    return CGRect(x: 0, y: 0, width: 720, height: 540)
-  }()
+  var rowMetrics: [String: RowMetrics] = [:]
+  var rowLayoutWidth: Double = 0
+  var trailingControlWidths: [TrailingControlKey: Double] = [:]
 
-  private let model: ExtensionsModel
-  private let scrollView = NSScrollView()
-  private let tableView = NSTableView()
-
-  private var displayedItems: [ExtensionsModel.Item] = []
   private var displayedMode: ExtensionsModel.Mode
-
-  /// While true, a whole-page overlay task (Refresh or Update All) drives the table and the observation-driven diff steps aside.
   private var isRunningProgressOverlay = false
-
-  /// Mirrors `model.pendingRelaunch` for layout; toggled with a slide-up animation on show.
   private var displayedRelaunch = false
   private var isAnimatingRelaunch = false
-  private var pendingScrollCategory: ExtensionEntry.Category?
+  private var pendingScrollTarget: ExtensionsScrollTarget?
+  private var highlightTask: Task<Void, Never>?
 
   private lazy var stateController = NSHostingController(
     rootView: ExtensionsStateView(model: model)
@@ -58,6 +81,10 @@ final class ExtensionsViewController: NSViewController {
     fatalError("init(coder:) has not been implemented")
   }
 
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+  }
+
   override func loadView() {
     view = NSView(frame: Self.defaultContentRect)
     configureTableView()
@@ -70,6 +97,10 @@ final class ExtensionsViewController: NSViewController {
 
     displayedItems = model.items
     displayedRelaunch = model.pendingRelaunch
+    layoutContents()
+
+    scrollView.layoutSubtreeIfNeeded()
+    rowLayoutWidth = rowContentWidth
     tableView.reloadData()
 
     updateStateController()
@@ -83,6 +114,7 @@ final class ExtensionsViewController: NSViewController {
     }
 
     layoutContents()
+    updateRowLayout()
   }
 }
 
@@ -155,6 +187,14 @@ extension ExtensionsViewController: NSTableViewDelegate {
     false
   }
 
+  func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+    guard displayedItems.indices.contains(row) else {
+      return tableView.rowHeight
+    }
+
+    return fittingHeight(for: displayedItems[row])
+  }
+
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
     let cell = tableView.makeView(withIdentifier: Constants.cellIdentifier, owner: self) as? TableCellWrapper ?? {
       let view = TableCellWrapper()
@@ -162,7 +202,15 @@ extension ExtensionsViewController: NSTableViewDelegate {
       return view
     }()
 
-    cell.configure(ExtensionsRowView(model: model, item: displayedItems[row], rowMargin: rowMargin))
+    let item = displayedItems[row]
+    cell.configure(rowContent(for: item) { [weak self] in
+      guard let self, let row = self.displayedItems.firstIndex(where: { $0.id == item.id }) else {
+        return
+      }
+
+      self.reloadRows(IndexSet(integer: row))
+    })
+
     return cell
   }
 
@@ -190,12 +238,26 @@ extension ExtensionsViewController: NSMenuDelegate {
       return
     }
 
-    // In Discover, offer a quick uninstall for extensions that are already installed
     let clickedItem = displayedItems[clickedRow]
-    guard model.mode == .discover, clickedItem.installed != nil else {
+    guard model.mode == .discover else {
       return
     }
 
+    let registryLink = "https://markedit-app.github.io/extensions/#\(clickedItem.id)"
+    menu.addItem(withTitle: Localized.Extension.copyRegistryLink) {
+      NSPasteboard.general.overwrite(string: registryLink)
+    }.toolTip = registryLink
+
+    let installLink = "markedit://install-extension?id=\(clickedItem.id)"
+    menu.addItem(withTitle: Localized.Extension.copyInstallLink) {
+      NSPasteboard.general.overwrite(string: installLink)
+    }.toolTip = installLink
+
+    guard clickedItem.installed != nil else {
+      return
+    }
+
+    menu.addItem(.separator())
     let item = menu.addItem(
       withTitle: Localized.Extension.uninstall,
       action: #selector(uninstallExtension(_:)),
@@ -243,11 +305,44 @@ extension ExtensionsViewController {
     }
   }
 
-  /// Scrolls to `category`'s first item; returns whether it scrolled now (else once rows load).
-  @discardableResult
-  func scrollTo(category: ExtensionEntry.Category) -> Bool {
-    pendingScrollCategory = category
-    return scrollToTargetCategory()
+  /// Adopts the current model snapshot without row animations, then scrolls to `target`.
+  func reveal(_ target: ExtensionsScrollTarget) {
+    let items = model.items
+    let shouldReload = displayedMode != model.mode || displayedItems != items
+
+    if shouldReload {
+      displayedMode = model.mode
+      displayedItems = items
+      tableView.reloadData()
+    }
+
+    pendingScrollTarget = target
+    scrollToPendingTarget()
+  }
+
+  /// Reveals the pending target, a no-op once it has been handled.
+  func scrollToPendingTarget() {
+    guard let target = pendingScrollTarget else {
+      return
+    }
+
+    let index = displayedItems.firstIndex(where: target.matches)
+    guard let index else {
+      return
+    }
+
+    pendingScrollTarget = nil
+    tableView.needsLayout = true
+    tableView.layoutSubtreeIfNeeded()
+
+    let rowRect = tableView.rect(ofRow: index)
+    let boundsOrigin = CGPoint(x: 0, y: rowRect.origin.y - view.safeAreaInsets.top)
+    scrollView.contentView.setBoundsOrigin(boundsOrigin)
+    scrollView.reflectScrolledClipView(scrollView.contentView)
+
+    if case .item(let id) = target {
+      flashHighlight(itemID: id)
+    }
   }
 }
 
@@ -260,15 +355,12 @@ private extension ExtensionsViewController {
     static let overScrollInset: Double = if #available(macOS 26.0, *) { 20 } else { 0 }
     static let overlayOpticalOffset: Double = 20
     static let minimumOverlayDuration: TimeInterval = 1.2
-  }
-
-  /// Horizontal margin for the row content; separators use the same value so they stay aligned.
-  var rowMargin: Double {
-    AppDesign.modernStyle ? 20 : 10
+    static let highlightDuration: Duration = .seconds(1.5)
   }
 
   /// Height of the relaunch bar's SwiftUI content (forces a layout pass first).
   var relaunchBarHeight: Double {
+    relaunchController.view.needsLayout = true
     relaunchController.view.layoutSubtreeIfNeeded()
     return relaunchController.view.fittingSize.height
   }
@@ -282,8 +374,7 @@ private extension ExtensionsViewController {
     tableView.style = .plain
     tableView.backgroundColor = .clear
     tableView.selectionHighlightStyle = .none
-    tableView.usesAutomaticRowHeights = true
-    tableView.rowHeight = 68
+    tableView.usesAutomaticRowHeights = false
     tableView.intercellSpacing = .zero
     tableView.dataSource = self
     tableView.delegate = self
@@ -300,6 +391,28 @@ private extension ExtensionsViewController {
     scrollView.drawsBackground = true
     scrollView.backgroundColor = .finderContentBackground
     view.addSubview(scrollView)
+
+    let contentView = scrollView.contentView
+    contentView.postsBoundsChangedNotifications = true
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(scrollViewBoundsDidChange),
+      name: NSView.boundsDidChangeNotification,
+      object: contentView
+    )
+  }
+
+  @objc func scrollViewBoundsDidChange(_ notification: Notification) {
+    let inlineRows = IndexSet(listInteraction.inlineUpdateItemIDs.compactMap { id in
+      displayedItems.firstIndex { $0.id == id }
+    })
+
+    listInteraction.inlineUpdateItemIDs.removeAll()
+    listInteraction.scrollGeneration &+= 1
+
+    if !inlineRows.isEmpty {
+      reloadRows(inlineRows)
+    }
   }
 
   func configureAccessoryViews() {
@@ -316,6 +429,7 @@ private extension ExtensionsViewController {
       _ = model.mode
       _ = model.items
       _ = model.phase
+      _ = model.hasLoadedIndex
       _ = model.pendingRelaunch
     } onChange: { [weak self] in
       Task { @MainActor in
@@ -334,6 +448,7 @@ private extension ExtensionsViewController {
     let modeChanged = model.mode != displayedMode
     if modeChanged {
       displayedMode = model.mode
+      listInteraction.inlineUpdateItemIDs.removeAll()
     }
 
     animateDifference(to: model.items)
@@ -343,7 +458,7 @@ private extension ExtensionsViewController {
       tableView.scrollRowToVisible(0)
     }
 
-    scrollToTargetCategory()
+    scrollToPendingTarget()
     updateRelaunchBar()
     updateStateController()
     view.needsLayout = true
@@ -352,8 +467,15 @@ private extension ExtensionsViewController {
   /// Animates row insertions and removals; surviving rows update themselves in place.
   func animateDifference(to newItems: [ExtensionsModel.Item]) {
     let oldItems = displayedItems
+    let oldIDs = Set(oldItems.map(\.id))
     displayedItems = newItems
     tableView.animateRows(from: oldItems, to: newItems)
+
+    let resizedRows = IndexSet(newItems.indices.filter { index in
+      oldIDs.contains(newItems[index].id) && needResizeRow(at: index, for: newItems[index])
+    })
+
+    reloadRows(resizedRows)
   }
 
   /// Frame-based layout so content imposes no Auto Layout fitting size, keeping the window resizable.
@@ -382,14 +504,15 @@ private extension ExtensionsViewController {
       right: 0
     ) : NSEdgeInsets()
 
-    // Center the state overlay in the visible area, nudged up by an optical offset
+    // Center the state overlay, nudged up by an optical offset. It spans the full width
+    // (SwiftUI centers the box) so long messages aren't clipped by a stale, narrower frame.
     let visibleHeight = max(0, bounds.height - topInset - relaunchHeight)
-    let stateSize = stateController.view.fittingSize
+    let stateHeight = stateController.view.fittingSize.height
     let stateFrame = CGRect(
-      x: ((bounds.width - stateSize.width) / 2).rounded(),
-      y: (relaunchHeight + (visibleHeight - stateSize.height) / 2 + Constants.overlayOpticalOffset).rounded(),
-      width: stateSize.width,
-      height: stateSize.height
+      x: 0,
+      y: (relaunchHeight + (visibleHeight - stateHeight) / 2 + Constants.overlayOpticalOffset).rounded(),
+      width: bounds.width,
+      height: stateHeight
     )
 
     if animated {
@@ -474,27 +597,20 @@ private extension ExtensionsViewController {
     }
   }
 
-  @discardableResult
-  func scrollToTargetCategory() -> Bool {
-    guard let category = pendingScrollCategory,
-          let index = (displayedItems.firstIndex { $0.category == category }) else {
-      return false
+  /// Flashes the row, scrolling alone is easy to miss. The cell animates itself.
+  func flashHighlight(itemID: String) {
+    highlightTask?.cancel()
+    model.highlightedItemID = itemID
+
+    // Capture the model, the flag must be cleared even if this controller goes away
+    highlightTask = Task { [model] in
+      try? await Task.sleep(for: Constants.highlightDuration)
+      guard !Task.isCancelled else {
+        return
+      }
+
+      model.highlightedItemID = nil
     }
-
-    pendingScrollCategory = nil
-    tableView.layoutSubtreeIfNeeded()
-
-    let clip = scrollView.contentView
-    let topInset = clip.contentInsets.top
-    let bottomInset = clip.contentInsets.bottom
-    let minY = -topInset
-    let maxY = max(minY, tableView.bounds.height + bottomInset - clip.bounds.height)
-    let targetY = min(max(tableView.rect(ofRow: index).minY - topInset, minY), maxY)
-
-    // Pin the theme row to the top (just below the titlebar), clamped to the scrollable range
-    clip.scroll(to: CGPoint(x: 0, y: targetY))
-    scrollView.reflectScrolledClipView(clip)
-    return true
   }
 
   @objc func uninstallExtension(_ sender: NSMenuItem) {

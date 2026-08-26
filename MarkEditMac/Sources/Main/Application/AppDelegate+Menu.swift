@@ -27,7 +27,7 @@ extension AppDelegate: NSMenuDelegate {
     case mainExtensionsMenu:
       reconfigureMainExtensionsMenu(document: currentDocument)
     case mainWindowMenu:
-      reconfigureMainWindowMenu(document: currentDocument)
+      reconfigureMainWindowMenu(window: NSApp.keyWindow)
     case openFileInMenu:
       reconfigureOpenFileInMenu(document: currentDocument)
     case reopenFileMenu:
@@ -38,6 +38,11 @@ extension AppDelegate: NSMenuDelegate {
       break
     }
   }
+
+  func reconfigureMainWindowMenu(window: NSWindow?) {
+    windowFloatingItem?.isEnabled = window is EditorWindow
+    windowFloatingItem?.setOn(window?.level == .floating)
+  }
 }
 
 // MARK: - NSMenuItemValidation
@@ -45,6 +50,8 @@ extension AppDelegate: NSMenuDelegate {
 extension AppDelegate: NSMenuItemValidation {
   func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
     switch menuItem.action {
+    case #selector(launchSafeMode(_:)):
+      return !AppCustomization.isSafeMode
     case #selector(newFileFromClipboard(_:)):
       return NSPasteboard.general.hasText
     case #selector(reopenClosedTab(_:)):
@@ -95,11 +102,10 @@ private extension AppDelegate {
       let isEnabled = $0.target === NSApp.appDelegate || document != nil
       $0.setEnabledRecursively(isEnabled: isEnabled)
     }
-  }
 
-  func reconfigureMainWindowMenu(document: EditorDocument?) {
-    windowFloatingItem?.isEnabled = NSApp.keyWindow is EditorWindow
-    windowFloatingItem?.setOn(NSApp.keyWindow?.level == .floating)
+    if let menu = mainExtensionsMenu {
+      currentEditor?.updateUserDefinedMenus(menu)
+    }
   }
 
   @MainActor
@@ -167,6 +173,14 @@ private extension AppDelegate {
 // MARK: - Private
 
 private extension AppDelegate {
+  @IBAction func launchSafeMode(_ sender: Any?) {
+    guard !AppCustomization.isSafeMode else {
+      return
+    }
+
+    NSApp.relaunchSafely(sender, safeMode: true)
+  }
+
   @IBAction func checkForUpdates(_ sender: Any?) {
     Task {
       await AppUpdater.checkForUpdates(explicitly: true)
@@ -200,10 +214,6 @@ private extension AppDelegate {
     ExtensionsWindowController.shared.present()
   }
 
-  @IBAction func openOfficialWebsite(_ sender: Any?) {
-    NSWorkspace.shared.safelyOpenURL(string: "https://markedit-app.github.io/extensions/")
-  }
-
   @IBAction func openCustomizationGuide(_ sender: Any?) {
     NSWorkspace.shared.safelyOpenURL(string: "https://github.com/MarkEdit-app/MarkEdit/wiki/Customization")
   }
@@ -218,5 +228,9 @@ private extension AppDelegate {
 
   @IBAction func openVersionHistory(_ sender: Any?) {
     NSWorkspace.shared.safelyOpenURL(string: "https://github.com/MarkEdit-app/MarkEdit/releases")
+  }
+
+  @IBAction func openUpdateBehavior(_ sender: Any?) {
+    NSWorkspace.shared.safelyOpenURL(string: "https://github.com/MarkEdit-app/MarkEdit/wiki/Customization#generalupdatebehavior")
   }
 }

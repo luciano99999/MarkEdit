@@ -8,10 +8,13 @@ import AppKit
 import AppKitExtensions
 import ExtensionCore
 import SettingsUI
+import MarkEditCore
 import MarkEditKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  @IBOutlet weak var mainAppMenuItem: NSMenuItem?
+
   @IBOutlet weak var mainFileMenu: NSMenu?
   @IBOutlet weak var mainEditMenu: NSMenu?
   @IBOutlet weak var mainExtensionsMenu: NSMenu?
@@ -52,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @IBOutlet weak var mainUpdateItem: NSMenuItem?
   @IBOutlet weak var presentUpdateItem: NSMenuItem?
+  @IBOutlet weak var restartUpdateItem: NSMenuItem?
   @IBOutlet weak var postponeUpdateItem: NSMenuItem?
   @IBOutlet weak var ignoreUpdateItem: NSMenuItem?
 
@@ -99,12 +103,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
 
+    DispatchQueue.global(qos: .utility).async {
+      EditorIndexHtml.copyToSharedContainer()
+    }
+
     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-      self.presentUpdateItem?.title = Localized.Updater.viewReleasePage
+      self.presentUpdateItem?.title = Localized.Updater.viewReleaseDetails
       self.postponeUpdateItem?.title = Localized.Updater.remindMeLater
       self.ignoreUpdateItem?.title = Localized.Updater.skipThisVersion
+      AppUpdater.presentStagedUpdateNotes()
 
       Task {
+        await AppUpdater.discardStagedUpdate()
         await AppUpdater.checkForUpdates(explicitly: false)
       }
 
@@ -140,6 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Install uncaught exception handler
     AppExceptionCatcher.install()
+
+    if AppCustomization.isSafeMode {
+      mainAppMenuItem?.title = Localized.General.safeModeAppName
+    }
   }
 
   func applicationShouldTerminate(_ application: NSApplication) -> NSApplication.TerminateReply {
@@ -157,6 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    AppRelauncher.commit()
+    AppUpdater.commitStagedUpdate()
     EditorSelectionHistory.purgeStaleEntries()
   }
 
@@ -210,7 +226,7 @@ private extension AppDelegate {
         return
       }
 
-      if NSApp.windows.allSatisfy({ !$0.isKeyWindow }) {
+      if (NSApp.windows.allSatisfy { !$0.isKeyWindow }) {
         NSApp.closeOpenPanels()
       }
     }

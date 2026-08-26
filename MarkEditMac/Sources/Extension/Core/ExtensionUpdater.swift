@@ -35,7 +35,11 @@ enum ExtensionUpdater {
       return
     }
 
-    let updates = ExtensionRegistry.availableUpdates(index: index)
+    // Updates needing a newer app are surfaced in the window only
+    let updates = ExtensionRegistry.availableUpdates(index: index).filter {
+      $0.unmetAppVersion == nil
+    }
+
     guard !updates.isEmpty else {
       return
     }
@@ -121,18 +125,9 @@ private extension ExtensionUpdater {
     let alert = NSAlert()
     alert.messageText = Localized.Extension.failedTitle
     alert.informativeText = failures
-      .map { "• \($0.name) - \(failureReason($0.error))" }
+      .map { "• \($0.name) - \(Localized.Extension.failureMessage(for: $0.error))" }
       .joined(separator: "\n\n") + "\n"
     alert.runModal()
-  }
-
-  /// A user-facing reason for a failed install, mirroring the single-install path.
-  static func failureReason(_ error: Error) -> String {
-    if case ExtensionDownloader.Failure.incompatible(let minAppVersion) = error {
-      return String(format: Localized.Extension.incompatibleFormat, minAppVersion)
-    }
-
-    return Localized.Extension.failedMessage
   }
 
   static func presentRelaunch() {
@@ -143,7 +138,7 @@ private extension ExtensionUpdater {
     alert.addButton(withTitle: Localized.Extension.laterButton)
 
     if alert.runModal() == .alertFirstButtonReturn {
-      NSWorkspace.shared.relaunchApp()
+      NSApp.relaunchSafely()
     }
   }
 }

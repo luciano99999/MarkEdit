@@ -1,5 +1,7 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, jest, test } from '@jest/globals';
 import { EditorSelection, EditorState } from '@codemirror/state';
+import { KeyBinding } from '@codemirror/view';
+import { editingState } from '../src/common/store';
 
 import * as editor from './utils/editor';
 import * as commands from '../src/modules/commands';
@@ -108,6 +110,36 @@ describe('Commands module', () => {
   });
 });
 
+describe('emoji backward deletion', () => {
+  const deleteBackward = (text: string) => {
+    editor.setUp(text);
+    editor.selectRange(text.length, text.length);
+    return {
+      handled: commands.deleteEmojiBackward(window.editor),
+      text: editor.getText(),
+    };
+  };
+
+  test.each(['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '#️⃣', '*️⃣'])(
+    'deletes the complete keycap %s',
+    emoji => expect(deleteBackward(emoji)).toEqual({ handled: true, text: '' }),
+  );
+
+  test.each(['👍🏽', '👩🏽', '☝️🏽', '🧑🏽‍🤝‍🧑🏻', '👩‍❤️‍👨🏽'])(
+    'deletes the complete skin-tone emoji %s',
+    emoji => expect(deleteBackward(emoji)).toEqual({ handled: true, text: '' }),
+  );
+
+  test('deletes the complete subdivision flag', () => {
+    expect(deleteBackward('🏴󠁧󠁢󠁥󠁮󠁧󠁿')).toEqual({ handled: true, text: '' });
+  });
+
+  test.each(['👨‍👩‍👧‍👦', '❤️', '🇺🇸', 'é', 'a'])(
+    'leaves unaffected input %s to CodeMirror',
+    text => expect(deleteBackward(text)).toEqual({ handled: false, text }),
+  );
+});
+
 describe('insertCodeBlock command', () => {
   function run(doc: string, ranges: [number, number][]) {
     editor.setUp(doc, EditorState.allowMultipleSelections.of(true));
@@ -149,5 +181,83 @@ describe('insertCodeBlock command', () => {
     const out = run('ab', [[0, 0], [2, 2]]);
     expect(out).not.toContain('#{');
     expect((out.match(/```/g) ?? []).length).toBe(4);
+  });
+});
+
+describe('formatContent', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    editingState.compositionEnded = true;
+  });
+
+  test('formats when no composition is active', () => {
+    editor.setUp('Hello  ');
+    expect(commands.formatContent(true, true, false)).toBe(true);
+    expect(editor.getText()).toBe('Hello\n');
+  });
+
+  test('preserves the viewport while formatting', () => {
+    editor.setUp('Hello');
+    const scrollSnapshot = jest.spyOn(window.editor, 'scrollSnapshot');
+    const dispatch = jest.spyOn(window.editor, 'dispatch');
+
+    expect(commands.formatContent(true, false, false)).toBe(true);
+    expect(scrollSnapshot).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ effects: expect.anything() }));
+  });
+
+  test('leaves the document untouched during a composition', () => {
+    editor.setUp('Hello  ');
+    editingState.compositionEnded = false;
+
+    expect(commands.formatContent(true, true, false)).toBe(false);
+    expect(editor.getText()).toBe('Hello  ');
+  });
+});
+
+describe('page scrolling', () => {
+  const runBinding = (key: string) => {
+    const binding = commands.customizedCommandsKeymap.find(item => item.key === key) as KeyBinding | undefined;
+    return binding?.run?.(window.editor);
+  };
+
+  const mockScroller = (clientHeight: number) => {
+    editor.setUp('Hello');
+    const scroller = window.editor.scrollDOM;
+    const calls: ScrollToOptions[] = [];
+
+    // defineProperty to bypass the read-only clientHeight and the overloaded scrollBy signature
+    Object.defineProperty(scroller, 'clientHeight', { value: clientHeight, configurable: true });
+    Object.defineProperty(scroller, 'scrollBy', {
+      value: (options: ScrollToOptions) => calls.push(options),
+      configurable: true,
+    });
+
+    return calls;
+  };
+
+  test('scrolls one page down, leaving the selection untouched', () => {
+    const calls = mockScroller(500);
+    editor.selectRange(0, 0);
+
+    expect(runBinding('PageDown')).toBe(true);
+    expect(calls).toEqual([{ top: 500 - window.editor.defaultLineHeight }]);
+    expect(window.editor.state.selection.main.head).toBe(0);
+  });
+
+  test('scrolls one page up, leaving the selection untouched', () => {
+    const calls = mockScroller(500);
+    editor.selectRange(3, 3);
+
+    expect(runBinding('PageUp')).toBe(true);
+    expect(calls).toEqual([{ top: -(500 - window.editor.defaultLineHeight) }]);
+    expect(window.editor.state.selection.main.head).toBe(3);
+  });
+
+  test('scrolls at least one line when the viewport is too short', () => {
+    const calls = mockScroller(0);
+
+    expect(runBinding('PageDown')).toBe(true);
+    expect(calls).toEqual([{ top: window.editor.defaultLineHeight }]);
   });
 });

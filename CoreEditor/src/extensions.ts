@@ -16,25 +16,30 @@ import { defaultKeymap } from '@codemirror/commands';
 import { highlightSelectionMatches, search } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { languages } from '@codemirror/language-data';
+import { html as bundledHTML } from '@codemirror/lang-html';
 import { history, historyKeymap } from './@vendor/commands/history';
 
 import { loadTheme } from './styling/themes';
 import { classHighlighters, markdownExtensions, markdownExtendedData, renderExtensions, actionExtensions } from './styling/markdown';
 import { lineIndicatorLayer } from './styling/nodes/line';
 import { linkStyles } from './styling/nodes/link';
+import { selectedLinesDecoration } from './styling/nodes/selection';
+import { invisiblesExtension } from './styling/nodes/invisible';
 import { paragraphIndentStyle, lineIndentStyle } from './styling/nodes/indent';
 import { gutterExtensions } from './styling/nodes/gutter';
 import { IndentBehavior } from './config';
+import { bundledLanguages } from './languages';
+import { editingState } from './common/store';
 
 import { isActive as isWritingToolsActive } from './modules/writingTools';
 import { localizePhrases } from './modules/localization';
 import { indentationKeymap } from './modules/indentation';
 import { filterTransaction, wordTokenizer, observeChanges, interceptInputs } from './modules/input';
-import { customizedCommandsKeymap } from './modules/commands';
+import { smartQuotesHandler } from './modules/smartQuotes';
+import { customizedCommandsKeymap, emojiDeletionKeymap } from './modules/commands';
 import { autocompleteExtensions, standardLinkCompletion, referenceLinkCompletion } from './modules/completion';
 import { tocKeymap } from './modules/toc';
-import { userExtensions, userMarkdownConfigs, userCodeLanguages } from './api/methods';
+import { userExtensions, userMarkdownConfigs, userCodeLanguages, userHTMLLanguage } from './api/methods';
 
 const theme = new Compartment;
 const readOnly = new Compartment;
@@ -88,7 +93,7 @@ export function extensions(options: { lineBreak?: string }) {
     window.config.autoCharacterPairs ? closeBrackets() : [],
     rectangularSelection(),
     crosshairCursor(),
-    activeLine.of(window.config.showActiveLineIndicator ? lineIndicatorLayer : []),
+    activeLine.of(window.config.showActiveLineIndicator && !editingState.hasSelection ? lineIndicatorLayer : []),
     highlightActiveLineGutter(),
     selectionHighlight.of(highlightSelectionMatches()),
     localizePhrases(),
@@ -113,6 +118,7 @@ export function extensions(options: { lineBreak?: string }) {
       //
       // Order matters
       ...closeBracketsKeymap,
+      ...emojiDeletionKeymap,
       ...defaultKeymap.filter(keymap => {
         // We use cmd-i to toggle italic
         if (keymap.key === 'Mod-i') {
@@ -120,7 +126,7 @@ export function extensions(options: { lineBreak?: string }) {
         }
 
         // We use customizedCommandsKeymap instead
-        if (keymap.key === 'Home' || keymap.key === 'End' || keymap.key === 'Mod-/') {
+        if (['Home', 'End', 'Mod-/', 'PageUp', 'PageDown'].includes(keymap.key ?? '')) {
           return false;
         }
 
@@ -152,14 +158,15 @@ export function extensions(options: { lineBreak?: string }) {
     theme.of(loadTheme(window.config.theme)),
     renderExtensions,
     actionExtensions,
-    invisibles.of([]), // Must after actionExtensions to have line breaks at the end
+    invisibles.of(invisiblesExtension(window.config.invisiblesBehavior, editingState.hasSelection)), // Must after actionExtensions to have line breaks at the end
     linkStyles, // Must after invisibles because whitespaces can break this
-    selectedLines.of([]),
+    selectedLines.of(window.config.focusMode ? selectedLinesDecoration : []),
 
     // Input handling
     wordTokenizer(),
     interceptInputs(),
     observeChanges(),
+    smartQuotesHandler,
 
     // Accessibility
     EditorView.contentAttributes.of({
@@ -170,10 +177,12 @@ export function extensions(options: { lineBreak?: string }) {
 }
 
 export function markdownConfigurations() {
+  // Both instances come from one module, they share the language data that drives completion
+  const html = userHTMLLanguage() ?? bundledHTML;
   const content = markdown({
     base: markdownLanguage,
     codeLanguages: [
-      ...languages,
+      ...bundledLanguages(html()),
       ...userCodeLanguages(),
     ],
     extensions: [
@@ -181,6 +190,7 @@ export function markdownConfigurations() {
       ...userMarkdownConfigs(),
     ],
     completeHTMLTags: false,
+    htmlTagLanguage: html({ matchClosingTags: false }),
   });
 
   return frontMatter({ content });

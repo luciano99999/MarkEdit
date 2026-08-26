@@ -73,9 +73,10 @@ enum AppRuntimeConfig {
     }
 
     enum UpdateBehavior: String, Codable {
-      case quiet = "quiet"
-      case notify = "notify"
-      case never = "never"
+      case never = "never"         // Don't check for updates
+      case quiet = "quiet"         // Only reveal the update menu
+      case notify = "notify"       // Always ask with an alert
+      case automatic = "automatic" // Download silently and install on quit
     }
 
     struct HotKey: Codable {
@@ -137,14 +138,16 @@ enum AppRuntimeConfig {
   }
 
   static let jsonLiteral: String = {
-    {
-      guard let fileData, (try? JSONSerialization.jsonObject(with: fileData, options: [])) != nil else {
-        Logger.log(.error, "Invalid json file was found at: \(AppCustomization.settings.fileURL)")
-        return nil
-      }
+    guard !AppCustomization.isSafeMode else {
+      return "{}"
+    }
 
-      return fileData.toString()
-    }() ?? "{}"
+    guard let fileData, (try? JSONSerialization.jsonObject(with: fileData, options: [])) != nil else {
+      Logger.log(.error, "Invalid json file was found at: \(AppCustomization.settings.fileURL)")
+      return "{}"
+    }
+
+    return fileData.toString() ?? "{}"
   }()
 
   static var jsonObject: [String: Any] {
@@ -337,6 +340,10 @@ private extension AppRuntimeConfig {
   )
 
   static let currentDefinition: Definition? = {
+    guard !AppCustomization.isSafeMode else {
+      return nil
+    }
+
     guard let fileData else {
       Logger.log(.error, "Missing settings.json to proceed")
       return nil

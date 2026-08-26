@@ -1,0 +1,75 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Open MarkEdit to complete the setup.": {
+      "comment": "Message of the QuickLook setup guidance",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 MarkEdit 以完成设置。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打開 MarkEdit 以完成設定。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri MarkEdit per completare la configurazione."
+          }
+        }
+      }
+    },
+    "Reset Window Size": {
+      "comment": "Menu item to reset the Quick Look window size",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置窗口大小"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設視窗大小"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristina dimensioni finestra"
+          }
+        }
+      }
+    },
+    "Takes effect after relaunching Quick Look": {
+      "comment": "Subtitle explaining when the Quick Look window size reset takes effect",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新启动“快速预览”后生效"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新啟動“快速查看”後生效"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ha effetto dopo aver riavviato Quick Look"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

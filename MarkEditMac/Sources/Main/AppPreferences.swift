@@ -159,6 +159,18 @@ enum AppPreferences {
         performUpdates { $0.setIndentUnit(indentUnit) }
       }
     }
+
+    static var smartQuotesEnabled: Bool {
+      guard UserDefaults.standard.object(forKey: WKAutomaticQuoteSubstitutionEnabled) != nil else {
+        return NSSpellChecker.isAutomaticQuoteSubstitutionEnabled
+      }
+
+      return UserDefaults.standard.bool(forKey: WKAutomaticQuoteSubstitutionEnabled)
+    }
+
+    static func smartQuotesOptionToggled() {
+      performUpdates { $0.setSmartQuotesEnabled(enabled: smartQuotesEnabled) }
+    }
   }
 
   enum Assistant {
@@ -250,6 +262,18 @@ enum AppPreferences {
 
     @Storage(key: "updater.completely-disabled", defaultValue: false)
     static var completelyDisabled: Bool
+
+    @Storage(key: "updater.staged-update-path", defaultValue: nil)
+    static var stagedUpdatePath: String?
+
+    @Storage(key: "updater.staged-update-version", defaultValue: nil)
+    static var stagedUpdateVersion: String?
+
+    @Storage(key: "updater.staged-update-notes", defaultValue: nil)
+    static var stagedUpdateNotes: String?
+
+    @Storage(key: "updater.unapplied-update-version", defaultValue: nil)
+    static var unappliedUpdateVersion: String?
   }
 
   enum Extensions {
@@ -267,12 +291,9 @@ extension FontStyle {
 extension AppPreferences {
   static func editorConfig(theme: String) -> EditorConfig {
     EditorConfig(
+      host: .mainApp,
       text: "",
-      theme: theme,
       fontFace: Editor.fontStyle.webFontFace,
-      fontSize: Editor.fontSize,
-      showLineNumbers: Editor.showLineNumbers,
-      showActiveLineIndicator: Editor.showActiveLineIndicator,
       invisiblesBehavior: {
       #if DEBUG
         if ProcessInfo.processInfo.environment["DEBUG_TAKING_SCREENSHOTS"] == "YES" {
@@ -284,6 +305,19 @@ extension AppPreferences {
         return Editor.invisiblesBehavior
       #endif
       }(),
+      tabKeyBehavior: Editor.tabKeyBehavior.rawValue,
+      localizable: EditorLocalizable.main,
+      autoCharacterPairs: AppRuntimeConfig.autoCharacterPairs,
+      indentBehavior: AppRuntimeConfig.indentBehavior,
+      undoGroupingInterval: AppRuntimeConfig.undoGroupingInterval,
+      headerFontSizeDiffs: AppRuntimeConfig.headerFontSizeDiffs,
+      visibleWhitespaceCharacter: AppRuntimeConfig.visibleWhitespaceCharacter,
+      visibleLineBreakCharacter: AppRuntimeConfig.visibleLineBreakCharacter,
+      searchNormalizers: AppRuntimeConfig.searchNormalizers,
+      theme: theme,
+      fontSize: Editor.fontSize,
+      showLineNumbers: Editor.showLineNumbers,
+      showActiveLineIndicator: Editor.showActiveLineIndicator,
       readOnlyMode: false,
       typewriterMode: Editor.typewriterMode,
       focusMode: Editor.focusMode,
@@ -292,23 +326,14 @@ extension AppPreferences {
       suggestWhileTyping: Assistant.suggestWhileTyping,
       standardDirectories: URL.standardDirectories,
       runtimeInfo: RuntimeInfo(
-        appVersion: Bundle.main.shortVersionString ?? "1.0.0",
+        appVersion: Bundle.main.shortVersionString,
         appBuild: Bundle.main.bundleVersion ?? "1",
         osVersion: ProcessInfo.processInfo.semanticOSVer,
         webkitVersion: Bundle.webkitBundle?.bundleVersion ?? ""
       ),
       defaultLineBreak: General.defaultLineEndings.characters,
-      tabKeyBehavior: Editor.tabKeyBehavior.rawValue,
       indentUnit: Editor.indentUnit.characters,
-      localizable: EditorLocalizable.main,
-      // Runtime config from settings.json, not dynamically changeable
-      autoCharacterPairs: AppRuntimeConfig.autoCharacterPairs,
-      indentBehavior: AppRuntimeConfig.indentBehavior,
-      undoGroupingInterval: AppRuntimeConfig.undoGroupingInterval,
-      headerFontSizeDiffs: AppRuntimeConfig.headerFontSizeDiffs,
-      visibleWhitespaceCharacter: AppRuntimeConfig.visibleWhitespaceCharacter,
-      visibleLineBreakCharacter: AppRuntimeConfig.visibleLineBreakCharacter,
-      searchNormalizers: AppRuntimeConfig.searchNormalizers
+      smartQuotesEnabled: Editor.smartQuotesEnabled
     )
   }
 }
@@ -345,7 +370,7 @@ extension AppPreferences.Window {
 
 // MARK: - Types
 
-enum Appearance: Codable {
+enum Appearance: String, CompactCodableEnum {
   case system
   case light
   case dark
@@ -362,7 +387,7 @@ enum Appearance: Codable {
   }
 }
 
-enum IndentUnit: Codable {
+enum IndentUnit: String, CompactCodableEnum {
   case twoSpaces
   case fourSpaces
   case oneTab
@@ -382,7 +407,7 @@ enum IndentUnit: Codable {
   }
 }
 
-enum LineHeight: Codable {
+enum LineHeight: String, CompactCodableEnum {
   case tight
   case normal
   case relaxed
@@ -399,7 +424,7 @@ enum LineHeight: Codable {
   }
 }
 
-enum NewWindowBehavior: Codable {
+enum NewWindowBehavior: String, CompactCodableEnum {
   case openDocument
   case newDocument
 }
@@ -425,7 +450,7 @@ enum NewFilenameExtension: String, Codable, CaseIterable {
   }
 }
 
-enum ToolbarMode: Codable {
+enum ToolbarMode: String, CompactCodableEnum {
   case normal
   case compact
   case hidden

@@ -97,8 +97,18 @@ final class ExtensionCoreTests: XCTestCase {
     XCTAssertEqual(release.pageURL?.absoluteString, "https://github.com/owner/repo/tree/v1.0.0")
   }
 
+  func testPageURLFromRawTagRef() {
+    let release = makeRelease(url: "https://raw.githubusercontent.com/owner/repo/refs/tags/v1.0.0/dist/ext.js")
+    XCTAssertEqual(release.pageURL?.absoluteString, "https://github.com/owner/repo/tree/v1.0.0")
+  }
+
   func testPageURLFromOfficialRawContentUsesReleasePage() {
     let release = makeRelease(url: "https://raw.githubusercontent.com/MarkEdit-app/MarkEdit-preview/v1.8.1/dist/ext.js")
+    XCTAssertEqual(release.pageURL?.absoluteString, "https://github.com/MarkEdit-app/MarkEdit-preview/releases/tag/v1.8.1")
+  }
+
+  func testPageURLFromOfficialRawTagRefUsesReleasePage() {
+    let release = makeRelease(url: "https://raw.githubusercontent.com/MarkEdit-app/MarkEdit-preview/refs/tags/v1.8.1/dist/ext.js")
     XCTAssertEqual(release.pageURL?.absoluteString, "https://github.com/MarkEdit-app/MarkEdit-preview/releases/tag/v1.8.1")
   }
 
@@ -115,6 +125,50 @@ final class ExtensionCoreTests: XCTestCase {
   func testPageURLFallsBackToHost() {
     let release = makeRelease(url: "https://example.com/path/ext.js")
     XCTAssertEqual(release.pageURL?.absoluteString, "https://example.com")
+  }
+
+  // MARK: - ExtensionEntry.discoverOrder
+
+  func testDiscoverOrderPrioritizesCategoryBeforeFeatured() {
+    let featuredTheme = makeEntry(id: "theme", category: .theme, featured: true)
+    let extensionEntry = makeEntry(id: "extension", category: .extension)
+
+    XCTAssertEqual(ExtensionEntry.discoverOrder([featuredTheme, extensionEntry]).map(\.id), ["extension", "theme"])
+  }
+
+  func testDiscoverOrderPrioritizesFeaturedBeforeDate() {
+    let newer = makeEntry(id: "newer", addedDate: "2026-08-18T02:00:00Z")
+    let featured = makeEntry(id: "featured", addedDate: "2026-08-01T00:00:00Z", featured: true)
+
+    XCTAssertEqual(ExtensionEntry.discoverOrder([newer, featured]).map(\.id), ["featured", "newer"])
+  }
+
+  func testDiscoverOrderTreatsFalseAndNilFeaturedEqually() {
+    let older = makeEntry(id: "older", addedDate: "2026-08-01T00:00:00Z", featured: false)
+    let newer = makeEntry(id: "newer", addedDate: "2026-08-18T02:00:00Z")
+
+    XCTAssertEqual(ExtensionEntry.discoverOrder([older, newer]).map(\.id), ["newer", "older"])
+  }
+
+  func testDiscoverOrderUsesReleaseDateThenAddedDate() {
+    let updated = makeEntry(
+      id: "updated",
+      addedDate: "2026-07-01T00:00:00Z",
+      releaseDate: "2026-08-18T02:00:00Z"
+    )
+
+    let added = makeEntry(id: "added", addedDate: "2026-08-10T00:00:00Z")
+    XCTAssertEqual(ExtensionEntry.discoverOrder([added, updated]).map(\.id), ["updated", "added"])
+  }
+
+  func testDiscoverOrderFallsBackToFinderStyleName() {
+    let beta = makeEntry(id: "first-id", name: "Beta")
+    let alpha = makeEntry(id: "last-id", name: "Alpha")
+    let theme10 = makeEntry(id: "theme-10", name: "Theme 10")
+    let theme2 = makeEntry(id: "theme-2", name: "Theme 2")
+
+    let entries = ExtensionEntry.discoverOrder([theme10, beta, theme2, alpha])
+    XCTAssertEqual(entries.map(\.id), ["last-id", "first-id", "theme-2", "theme-10"])
   }
 
   // MARK: - availableUpdates
@@ -156,20 +210,21 @@ final class ExtensionCoreTests: XCTestCase {
     XCTAssertEqual(updates.first?.entry.latest.version, "2.0.0")
   }
 
-  func testAvailableUpdatesSkipsIncompatibleVersionlessOfficial() {
+  func testAvailableUpdatesFlagsIncompatibleVersionlessOfficial() {
     ExtensionEnvironment.appVersion = "1.5.0"
 
-    // An incompatible release is skipped before version-less adoption
+    // Adopted and flagged, not skipped
     let index = makeIndex([makeEntry(id: "markedit-preview", version: "2.0.0", minAppVersion: "9.0.0")])
     let updates = ExtensionRegistry.availableUpdates(
       index: index,
       installed: [makeInstalled(id: "markedit-preview", version: nil)]
     )
 
-    XCTAssertTrue(updates.isEmpty)
+    XCTAssertEqual(updates.count, 1)
+    XCTAssertEqual(updates.first?.unmetAppVersion, "9.0.0")
   }
 
-  func testAvailableUpdatesSkipsIncompatibleRelease() {
+  func testAvailableUpdatesFlagsIncompatibleRelease() {
     ExtensionEnvironment.appVersion = "1.5.0"
     let index = makeIndex([makeEntry(id: "sample", version: "2.0.0", minAppVersion: "9.0.0")])
     let updates = ExtensionRegistry.availableUpdates(
@@ -177,7 +232,20 @@ final class ExtensionCoreTests: XCTestCase {
       installed: [makeInstalled(id: "sample", version: "1.0.0")]
     )
 
-    XCTAssertTrue(updates.isEmpty)
+    XCTAssertEqual(updates.count, 1)
+    XCTAssertEqual(updates.first?.unmetAppVersion, "9.0.0")
+  }
+
+  func testAvailableUpdatesLeavesCompatibleReleaseUnflagged() {
+    ExtensionEnvironment.appVersion = "1.5.0"
+    let index = makeIndex([makeEntry(id: "sample", version: "2.0.0", minAppVersion: "1.4.0")])
+    let updates = ExtensionRegistry.availableUpdates(
+      index: index,
+      installed: [makeInstalled(id: "sample", version: "1.0.0")]
+    )
+
+    XCTAssertEqual(updates.count, 1)
+    XCTAssertNil(updates.first?.unmetAppVersion)
   }
 
   func testAvailableUpdatesSkipsEqualOrOlder() {
@@ -244,6 +312,84 @@ final class ExtensionCoreTests: XCTestCase {
     XCTAssertFalse(ExtensionRegistry.hasCachedUpdates)
   }
 
+  // MARK: - Registry dates
+
+  func testRegistryDatesDecodeAsISO8601() throws {
+    let json = """
+    {
+      "id": "a",
+      "name": "A",
+      "description": "",
+      "author": "",
+      "homepage": "",
+      "addedDate": "2026-08-01T00:00:00Z",
+      "category": "extension",
+      "latest": {
+        "version": "1.0.0",
+        "date": "2026-08-12T02:00:00Z",
+        "url": "https://example.com/a.js",
+        "sha256": "abc"
+      }
+    }
+    """
+
+    let entry = try decodeRegistry(ExtensionEntry.self, from: Data(json.utf8))
+    XCTAssertEqual(entry.addedDate, iso8601Date("2026-08-01T00:00:00Z"))
+    XCTAssertEqual(entry.latest.date, iso8601Date("2026-08-12T02:00:00Z"))
+  }
+
+  // MARK: - ExtensionEntry.featured
+
+  func testFeaturedDefaultsToNilWhenAbsent() throws {
+    let json = """
+    {
+      "id": "a",
+      "name": "A",
+      "description": "",
+      "author": "",
+      "homepage": "",
+      "category": "extension",
+      "latest": { "version": "1.0.0", "url": "https://example.com/a.js", "sha256": "abc" }
+    }
+    """
+    let entry = try JSONDecoder().decode(ExtensionEntry.self, from: Data(json.utf8))
+    XCTAssertNil(entry.featured)
+  }
+
+  func testFeaturedDecodesWhenPresent() throws {
+    let json = """
+    {
+      "id": "a",
+      "name": "A",
+      "description": "",
+      "author": "",
+      "homepage": "",
+      "category": "extension",
+      "featured": true,
+      "latest": { "version": "1.0.0", "url": "https://example.com/a.js", "sha256": "abc" }
+    }
+    """
+    let entry = try JSONDecoder().decode(ExtensionEntry.self, from: Data(json.utf8))
+    XCTAssertTrue(try XCTUnwrap(entry.featured))
+  }
+
+  // MARK: - ExtensionRelease.date
+
+  func testReleaseDateDecodingIsBackwardCompatible() throws {
+    let dated = try decodeRegistry(
+      ExtensionRelease.self,
+      from: Data(#"{"version":"1.1.0","date":"2026-08-12T02:00:00Z","url":"https://example.com/a.js","sha256":"abc"}"#.utf8)
+    )
+
+    let undated = try decodeRegistry(
+      ExtensionRelease.self,
+      from: Data(#"{"version":"1.0.0","url":"https://example.com/a.js","sha256":"abc"}"#.utf8)
+    )
+
+    XCTAssertEqual(dated.date, iso8601Date("2026-08-12T02:00:00Z"))
+    XCTAssertNil(undated.date)
+  }
+
   // MARK: - ExtensionIndex.isSupported
 
   func testIndexSchemaVersionSupport() {
@@ -273,6 +419,75 @@ final class ExtensionCoreTests: XCTestCase {
     // A new id is appended
     ExtensionConfig.upsertInstalled(makeInstalled(id: "d", version: "1.0.0"))
     XCTAssertEqual(installedIds(in: dir), ["a", "b", "c", "d"])
+  }
+
+  func testUpsertInsertsNewEntryBeforeBoundary() throws {
+    let dir = try makeTempDir()
+    defer {
+      try? FileManager.default.removeItem(at: dir)
+      ExtensionEnvironment.documentsDirectory = URL.documentsDirectory
+    }
+
+    ExtensionEnvironment.documentsDirectory = dir
+    try seedExtensions(ids: ["extension-a", "theme-a", "local-a"], in: dir)
+
+    ExtensionConfig.upsertInstalled(
+      makeInstalled(id: "extension-b", version: "1.0.0"),
+      afterID: "extension-a",
+      beforeIDs: ["theme-a", "local-a"]
+    )
+
+    ExtensionConfig.upsertInstalled(
+      makeInstalled(id: "theme-b", version: "1.0.0"),
+      afterID: "theme-a",
+      beforeIDs: ["local-a"]
+    )
+
+    XCTAssertEqual(
+      installedIds(in: dir),
+      ["extension-a", "extension-b", "theme-a", "theme-b", "local-a"]
+    )
+  }
+
+  func testUpsertUsesBoundaryWhenCategoryIsEmpty() throws {
+    let dir = try makeTempDir()
+    defer {
+      try? FileManager.default.removeItem(at: dir)
+      ExtensionEnvironment.documentsDirectory = URL.documentsDirectory
+    }
+
+    ExtensionEnvironment.documentsDirectory = dir
+    try seedExtensions(ids: ["theme-a", "local-a"], in: dir)
+
+    ExtensionConfig.upsertInstalled(
+      makeInstalled(id: "extension-a", version: "1.0.0"),
+      beforeIDs: ["theme-a", "local-a"]
+    )
+
+    XCTAssertEqual(installedIds(in: dir), ["extension-a", "theme-a", "local-a"])
+  }
+
+  // MARK: - reconcileInstalled
+
+  func testReconcileAppendsNewLocalFilesAfterManagedEntries() throws {
+    let dir = try makeTempDir()
+    defer {
+      try? FileManager.default.removeItem(at: dir)
+      ExtensionEnvironment.documentsDirectory = URL.documentsDirectory
+    }
+
+    ExtensionEnvironment.documentsDirectory = dir
+    try seedExtensions(ids: ["extension-a", "theme-a"], in: dir)
+
+    let scripts = dir.appending(path: "scripts", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+
+    for id in ["extension-a", "theme-a", "local-b", "local-a"] {
+      try Data(id.utf8).write(to: scripts.appending(path: "\(id).js", directoryHint: .notDirectory))
+    }
+
+    ExtensionConfig.reconcileInstalled()
+    XCTAssertEqual(installedIds(in: dir), ["extension-a", "theme-a", "local-a", "local-b"])
   }
 
   // MARK: - setEnabled
@@ -400,17 +615,35 @@ private extension ExtensionCoreTests {
     )
   }
 
-  func makeEntry(id: String, version: String, minAppVersion: String? = nil) -> ExtensionEntry {
+  func makeEntry(
+    id: String,
+    name: String? = nil,
+    version: String = "1.0.0",
+    minAppVersion: String? = nil,
+    category: ExtensionEntry.Category = .extension,
+    addedDate: String? = nil,
+    releaseDate: String? = nil,
+    featured: Bool? = nil
+  ) -> ExtensionEntry {
     ExtensionEntry(
       id: id,
-      name: id,
+      name: name ?? id,
       description: "",
       author: "",
       homepage: "",
-      category: .extension,
+      addedDate: addedDate.map(iso8601Date),
+      category: category,
       colorScheme: nil,
       colorPatterns: nil,
-      latest: makeRelease(version: version, minAppVersion: minAppVersion)
+      featured: featured,
+      latest: ExtensionRelease(
+        version: version,
+        url: "https://example.com/sample.js",
+        sha256: "abc",
+        minAppVersion: minAppVersion,
+        date: releaseDate.map(iso8601Date),
+        notes: nil
+      )
     )
   }
 
@@ -462,8 +695,20 @@ private extension ExtensionCoreTests {
     let cacheDir = ExtensionEnvironment.indexCacheDirectory
     try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
-    let data = try JSONEncoder().encode(index)
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let data = try encoder.encode(index)
     try data.write(to: cacheDir.appending(path: "index.json", directoryHint: .notDirectory))
+  }
+
+  func decodeRegistry<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return try decoder.decode(type, from: data)
+  }
+
+  func iso8601Date(_ value: String) -> Date {
+    ISO8601DateFormatter().date(from: value) ?? .distantPast
   }
 
   func installedIds(in dir: URL) -> [String] {

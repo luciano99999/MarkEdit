@@ -2698,36 +2698,6 @@
         }
       }
     },
-    "J5p-F8-eb5.title": {
-      "comment": "Class = \"NSMenuItem\"; title = \"Official Website\"; ObjectID = \"J5p-F8-eb5\";",
-      "extractionState": "extracted_with_value",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Official Website"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "官方网站"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "官方網站"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estensioni ufficiali"
-          }
-        }
-      }
-    },
     "j7w-ok-RLg.title": {
       "comment": "Class = \"NSMenuItem\"; title = \"Grant Folder Access\"; ObjectID = \"j7w-ok-RLg\";",
       "extractionState": "extracted_with_value",
@@ -2814,6 +2784,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia percorso"
+          }
+        }
+      }
+    },
+    "Jxm-Gq-txn.title": {
+      "comment": "Class = \"NSMenuItem\"; title = \"Update Behavior…\"; ObjectID = \"Jxm-Gq-txn\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Update Behavior…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新行为…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新行為…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comportamento aggiornamenti…"
           }
         }
       }
@@ -5743,6 +5743,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seleziona sezione successiva"
+          }
+        }
+      }
+    },
+    "zSM-YV-rGb.title": {
+      "comment": "Class = \"NSMenuItem\"; title = \"Launch Safe Mode\"; ObjectID = \"zSM-YV-rGb\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Launch Safe Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以安全模式启动"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以安全模式啟動"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia in modalità sicura"
           }
         }
       }

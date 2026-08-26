@@ -295,18 +295,21 @@ extension EditorViewController: EditorModuleCoreDelegate {
 // MARK: - EditorModuleCompletionDelegate
 
 extension EditorViewController: EditorModuleCompletionDelegate {
+  // swiftlint:disable:next function_parameter_count
   func editorCompletion(
     _ sender: EditorModuleCompletion,
     request prefix: String,
     anchor: TextTokenizeAnchor,
     partialRange: NSRange,
-    tokenizedWords: [String]
+    tokenizedWords: [String],
+    userInitiated: Bool,
   ) {
     requestCompletions(
       prefix: prefix,
       anchor: anchor,
       partialRange: partialRange,
-      tokenizedWords: tokenizedWords
+      tokenizedWords: tokenizedWords,
+      userInitiated: userInitiated
     )
   }
 
@@ -414,6 +417,26 @@ extension EditorViewController: EditorModuleAPIDelegate {
     }
 
     return URL(filePath: path)
+  }
+
+  func editorAPI(_ sender: EditorModuleAPI, restoreFileVersionContent content: String) async -> Bool {
+    guard let document else {
+      return false
+    }
+
+    document.stringValue = content
+    resetEditor()
+    await waitUntilEditorReset()
+    await document.waitUntilSaveCompleted()
+    return true
+  }
+
+  func editorAPITerminateApp(_ sender: EditorModuleAPI) {
+    NSApp.terminateSafely()
+  }
+
+  func editorAPIRelaunchApp(_ sender: EditorModuleAPI) {
+    NSApp.relaunchSafely()
   }
 }
 

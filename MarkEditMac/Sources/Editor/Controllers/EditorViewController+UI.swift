@@ -302,13 +302,17 @@ extension EditorViewController {
       cancelCompletion()
     }
 
-    NSSpellChecker.shared.declineCorrectionIndicator(for: webView)
+    // Checked first because this is called on every scroll end, the spell checker is out of process
+    if NSSpellChecker.hasVisibleCorrectionPanel {
+      NSSpellChecker.shared.declineCorrectionIndicator(for: webView)
+    }
+
     presentedPopover?.close()
   }
 
   @discardableResult
   func removePresentedPopovers(contentClass: AnyClass) -> Bool {
-    guard let presented = presentedViewControllers?.filter({ $0.isKind(of: contentClass) }) else {
+    guard let presented = (presentedViewControllers?.filter { $0.isKind(of: contentClass) }) else {
       return false
     }
 
@@ -340,7 +344,7 @@ extension EditorViewController {
   }
 
   func resetUserDefinedMenuItems() {
-    guard view.window?.isKeyWindow == true else {
+    guard isViewLoaded, view.window?.isKeyWindow == true else {
       return Logger.log(.debug, "Menu items are for the key window")
     }
 

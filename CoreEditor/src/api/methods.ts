@@ -1,20 +1,29 @@
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
-import { LanguageDescription } from '@codemirror/language';
+import { LanguageDescription, LanguageSupport } from '@codemirror/language';
 import { MarkdownConfig } from '@lezer/markdown';
-import { RuntimeInfo } from 'markedit-api';
+import { EditorConfigChange, RuntimeInfo } from 'markedit-api';
 import { markdownConfigurations } from '../extensions';
+
+type EditorReadyListener = (editor: EditorView) => void;
+type EditorConfigChangeListener = (...change: EditorConfigChange) => void;
+type HTMLConfig = { matchClosingTags?: boolean };
+type HTMLLanguage = (config?: HTMLConfig) => LanguageSupport;
 
 export function onAppReady(listener: () => void) {
   storage.appReadyListeners.push(listener);
 }
 
-export function onEditorReady(listener: (editorView: EditorView) => void) {
+export function onEditorReady(listener: EditorReadyListener) {
   storage.editorReadyListeners.push(listener);
 
   if (isEditorReady()) {
-    listener(window.editor);
+    notifyEditorReadySafely(listener, window.editor);
   }
+}
+
+export function onEditorConfigChange(listener: EditorConfigChangeListener) {
+  storage.editorConfigChangeListeners.push(listener);
 }
 
 export function notifyAppReady() {
@@ -57,18 +66,44 @@ export function addExtension(extension: Extension) {
   }
 }
 
-export function addMarkdownConfig(config: MarkdownConfig) {
-  storage.markdownConfigs.push(config);
+export function addMarkdownConfig(config: MarkdownConfig | MarkdownConfig[]) {
+  if (Array.isArray(config)) {
+    storage.markdownConfigs.push(...config);
+  } else {
+    storage.markdownConfigs.push(config);
+  }
+
   reconfigureMarkdown();
 }
 
-export function addCodeLanguage(language: LanguageDescription) {
-  storage.codeLanguages.push(language);
+export function addCodeLanguage(language: LanguageDescription | LanguageDescription[]) {
+  if (Array.isArray(language)) {
+    storage.codeLanguages.push(...language);
+  } else {
+    storage.codeLanguages.push(language);
+  }
+
   reconfigureMarkdown();
 }
 
-export function editorReadyListeners() {
-  return storage.editorReadyListeners;
+export function overrideHTMLLanguage(html: HTMLLanguage) {
+  storage.htmlLanguage = html;
+  reconfigureMarkdown();
+}
+
+export function notifyEditorReady(editorView: EditorView) {
+  const listeners = storage.editorReadyListeners;
+  listeners.forEach(listener => notifyEditorReadySafely(listener, editorView));
+}
+
+export function notifyEditorConfigChange(...change: EditorConfigChange) {
+  storage.editorConfigChangeListeners.forEach(listener => {
+    try {
+      listener(...change);
+    } catch (error) {
+      console.error('Failed to notify an editor-config-change listener:', error);
+    }
+  });
 }
 
 export function userExtensions(): Extension[] {
@@ -83,6 +118,10 @@ export function userCodeLanguages(): LanguageDescription[] {
   return storage.codeLanguages;
 }
 
+export function userHTMLLanguage(): HTMLLanguage | undefined {
+  return storage.htmlLanguage;
+}
+
 function reconfigureMarkdown() {
   if (isEditorReady()) {
     window.editor.dispatch({
@@ -95,16 +134,28 @@ function isEditorReady() {
   return typeof window.editor.dispatch === 'function';
 }
 
+function notifyEditorReadySafely(listener: EditorReadyListener, editorView: EditorView) {
+  try {
+    listener(editorView);
+  } catch (error) {
+    console.error('Failed to notify an editor-ready listener:', error);
+  }
+}
+
 const storage: {
   appReadyListeners: (() => void)[];
-  editorReadyListeners: ((editorView: EditorView) => void)[];
+  editorReadyListeners: EditorReadyListener[];
+  editorConfigChangeListeners: EditorConfigChangeListener[];
   extensions: Extension[];
   markdownConfigs: MarkdownConfig[];
   codeLanguages: LanguageDescription[];
+  htmlLanguage?: HTMLLanguage;
 } = {
   appReadyListeners: [],
   editorReadyListeners: [],
+  editorConfigChangeListeners: [],
   extensions: [],
   markdownConfigs: [],
   codeLanguages: [],
+  htmlLanguage: undefined,
 };

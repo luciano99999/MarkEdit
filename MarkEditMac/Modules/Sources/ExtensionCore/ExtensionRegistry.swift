@@ -14,6 +14,7 @@ public struct ExtensionRelease: Codable, Equatable, Sendable {
   public let url: String
   public let sha256: String
   public let minAppVersion: String?
+  public let date: Date?
   public let notes: String?
 
   public init(
@@ -21,29 +22,21 @@ public struct ExtensionRelease: Codable, Equatable, Sendable {
     url: String,
     sha256: String,
     minAppVersion: String?,
+    date: Date? = nil,
     notes: String?
   ) {
     self.version = version
     self.url = url
     self.sha256 = sha256
     self.minAppVersion = minAppVersion
+    self.date = date
     self.notes = notes
   }
 }
 
-public extension ExtensionRelease {
-  /// Whether the running app meets this release's minimum version requirement.
-  var isCompatible: Bool {
-    guard let minAppVersion, !minAppVersion.isEmpty else {
-      return true
-    }
-
-    let current = ExtensionEnvironment.appVersion
-    return minAppVersion.compare(current, options: .numeric) != .orderedDescending
-  }
-
+extension ExtensionRelease {
   /// A browsable page for this release: the GitHub release page for a release-asset URL.
-  var pageURL: URL? {
+  public var pageURL: URL? {
     guard let components = URLComponents(string: url), let host = components.host else {
       return nil
     }
@@ -58,7 +51,8 @@ public extension ExtensionRelease {
     // or github.com/{owner}/{repo}/blob/{ref}/... (e.g. a ?raw=true link).
     let source: (owner: String, repo: String, ref: String)? = {
       if host == "raw.githubusercontent.com", parts.count >= 4 {
-        return (parts[0], parts[1], parts[2])
+        let ref = parts.count >= 6 && parts[2] == "refs" && parts[3] == "tags" ? parts[4] : parts[2]
+        return (parts[0], parts[1], ref)
       }
 
       if host == "github.com", parts.count >= 5, parts[2] == "blob" {
@@ -77,6 +71,16 @@ public extension ExtensionRelease {
 
     // Fall back to the host root
     return URL(string: "\(components.scheme ?? "https")://\(host)")
+  }
+
+  /// Whether the running app meets this release's minimum version requirement.
+  var isCompatible: Bool {
+    guard let minAppVersion, !minAppVersion.isEmpty else {
+      return true
+    }
+
+    let current = ExtensionEnvironment.appVersion
+    return minAppVersion.compare(current, options: .numeric) != .orderedDescending
   }
 }
 
@@ -98,9 +102,11 @@ public struct ExtensionEntry: Codable, Equatable, Sendable {
   public let description: String
   public let author: String
   public let homepage: String
+  public let addedDate: Date?
   public let category: Category
   public let colorScheme: ColorScheme?
   public let colorPatterns: [String]?
+  public let featured: Bool?
   public let latest: ExtensionRelease
 
   public init(
@@ -109,9 +115,11 @@ public struct ExtensionEntry: Codable, Equatable, Sendable {
     description: String,
     author: String,
     homepage: String,
+    addedDate: Date? = nil,
     category: Category,
     colorScheme: ColorScheme?,
     colorPatterns: [String]?,
+    featured: Bool?,
     latest: ExtensionRelease
   ) {
     self.id = id
@@ -119,10 +127,37 @@ public struct ExtensionEntry: Codable, Equatable, Sendable {
     self.description = description
     self.author = author
     self.homepage = homepage
+    self.addedDate = addedDate
     self.category = category
     self.colorScheme = colorScheme
     self.colorPatterns = colorPatterns
+    self.featured = featured
     self.latest = latest
+  }
+}
+
+extension ExtensionEntry {
+  public static func discoverOrder(_ entries: [Self]) -> [Self] {
+    entries.sorted { lhs, rhs in
+      if lhs.category != rhs.category {
+        return lhs.category == .extension
+      }
+
+      let lhsFeatured = lhs.featured == true
+      let rhsFeatured = rhs.featured == true
+      if lhsFeatured != rhsFeatured {
+        return lhsFeatured
+      }
+
+      let lhsDate = lhs.latest.date ?? lhs.addedDate
+      let rhsDate = rhs.latest.date ?? rhs.addedDate
+      if lhsDate != rhsDate {
+        return lhsDate ?? .distantPast > rhsDate ?? .distantPast
+      }
+
+      let nameOrder = lhs.name.localizedStandardCompare(rhs.name)
+      return nameOrder == .orderedSame ? lhs.id < rhs.id : nameOrder == .orderedAscending
+    }
   }
 }
 
@@ -149,6 +184,11 @@ public struct ExtensionIndex: Codable, Equatable, Sendable {
 public struct ExtensionUpdate: Sendable {
   public let installed: ExtensionConfig.Installed
   public let entry: ExtensionEntry
+
+  /// The app version needed, set only when the running app is too old.
+  public var unmetAppVersion: String? {
+    entry.latest.isCompatible ? nil : entry.latest.minAppVersion
+  }
 }
 
 /// Fetches and caches the registry index.
@@ -162,7 +202,7 @@ public enum ExtensionRegistry {
       return nil
     }
 
-    guard let index = try? JSONDecoder().decode(ExtensionIndex.self, from: data) else {
+    guard let index = decodeIndex(from: data) else {
       return nil
     }
 
@@ -245,7 +285,7 @@ public enum ExtensionRegistry {
       // Not Modified, the cache is still current
       return fallbackIndex()
     case 200:
-      guard let index = try? JSONDecoder().decode(ExtensionIndex.self, from: data) else {
+      guard let index = decodeIndex(from: data) else {
         Logger.log(.error, "Failed to decode the registry index")
         return fallbackIndex()
       }
@@ -263,18 +303,13 @@ public enum ExtensionRegistry {
     }
   }
 
-  /// Version-tracked installs with a newer, compatible release in the registry.
+  /// Version-tracked installs with a newer release, incompatible ones flagged by `unmetAppVersion`.
   public static func availableUpdates(
     index: ExtensionIndex,
     installed: [ExtensionConfig.Installed] = ExtensionConfig.installed
   ) -> [ExtensionUpdate] {
     installed.compactMap { installed in
       guard let entry = (index.extensions.first { $0.id == installed.id }) else {
-        return nil
-      }
-
-      // Skip releases the current app can't run
-      guard entry.latest.isCompatible else {
         return nil
       }
 
@@ -292,7 +327,7 @@ public enum ExtensionRegistry {
     }
   }
 
-  /// Whether the cached index currently surfaces any updates for installed extensions.
+  /// Whether the cached index offers any update the running app can install.
   ///
   /// Reads from disk only, never triggers a network fetch.
   public static var hasCachedUpdates: Bool {
@@ -300,7 +335,7 @@ public enum ExtensionRegistry {
       return false
     }
 
-    return !availableUpdates(index: index).isEmpty
+    return availableUpdates(index: index).contains { $0.unmetAppVersion == nil }
   }
 }
 
@@ -315,9 +350,15 @@ private extension ExtensionRegistry {
       return nil
     }
 
-    return try? JSONDecoder().decode(ExtensionIndex.self, from: data)
+    return decodeIndex(from: data)
   }
 #endif
+
+  static func decodeIndex(from data: Data) -> ExtensionIndex? {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return try? decoder.decode(ExtensionIndex.self, from: data)
+  }
 
   /// The cached index to use when a refresh can't produce a new one.
   ///

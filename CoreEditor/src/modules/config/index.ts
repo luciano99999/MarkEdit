@@ -9,6 +9,7 @@ import { editingState } from '../../common/store';
 import { tryGetEditor, afterDomUpdate } from '../../common/utils';
 import { notifyBackgroundColor } from '../../styling/helper';
 import { loadTheme } from '../../styling/themes';
+import { notifyEditorConfigChange } from '../../api/methods';
 
 import * as styling from '../../styling/config';
 import * as completion from '../completion';
@@ -17,28 +18,35 @@ export function setTheme(name: string) {
   window.config.theme = name;
   styling.setTheme(loadTheme(name));
   afterDomUpdate(notifyBackgroundColor);
+  notifyEditorConfigChange('theme', name);
 }
 
 export function setFontFace(fontFace: WebFontFace) {
   styling.setFontFace(fontFace);
   window.config.fontFace = fontFace;
-  window.editor.requestMeasure();
 
-  recalculateTextMetrics();
-}
-
-export function setFontSize(fontSize: number) {
-  const wasBigChange = Math.abs(fontSize - window.config.fontSize) > 3;
-  styling.setFontSize(fontSize);
-
-  window.config.fontSize = fontSize;
-  window.editor.requestMeasure();
-
-  if (wasBigChange) {
-    setTimeout(refreshEditFocus, 300);
+  const editor = tryGetEditor();
+  if (editor !== null) {
+    editor.requestMeasure();
+    refreshEditFocus();
   }
 
   recalculateTextMetrics();
+  notifyEditorConfigChange('fontFace', fontFace);
+}
+
+export function setFontSize(fontSize: number) {
+  styling.setFontSize(fontSize);
+  window.config.fontSize = fontSize;
+
+  const editor = tryGetEditor();
+  if (editor !== null) {
+    editor.requestMeasure();
+    refreshEditFocus();
+  }
+
+  recalculateTextMetrics();
+  notifyEditorConfigChange('fontSize', fontSize);
 }
 
 export function setShowLineNumbers(enabled: boolean) {
@@ -51,14 +59,17 @@ export function setShowLineNumbers(enabled: boolean) {
   }
 
   adjustGutterPositions();
+  notifyEditorConfigChange('showLineNumbers', enabled);
 }
 
 export function setShowActiveLineIndicator(enabled: boolean) {
   window.config.showActiveLineIndicator = enabled;
   styling.setShowActiveLineIndicator(enabled && !editingState.hasSelection);
+  notifyEditorConfigChange('showActiveLineIndicator', enabled);
 }
 
 export function setInvisiblesBehavior(behavior: InvisiblesBehavior, updateSelection = false) {
+  const changed = window.config.invisiblesBehavior !== behavior;
   window.config.invisiblesBehavior = behavior;
   styling.setInvisiblesBehavior(behavior);
 
@@ -66,6 +77,10 @@ export function setInvisiblesBehavior(behavior: InvisiblesBehavior, updateSelect
   if (updateSelection && behavior === InvisiblesBehavior.selection) {
     const selection = window.editor.state.selection;
     window.editor.dispatch({ selection });
+  }
+
+  if (changed) {
+    notifyEditorConfigChange('invisiblesBehavior', behavior);
   }
 }
 
@@ -82,6 +97,8 @@ export function setReadOnlyMode(enabled: boolean) {
   } else {
     window.editor.contentDOM.focus();
   }
+
+  notifyEditorConfigChange('readOnlyMode', enabled);
 }
 
 export function setTypewriterMode(enabled: boolean) {
@@ -89,16 +106,19 @@ export function setTypewriterMode(enabled: boolean) {
   styling.setTypewriterMode(enabled);
 
   scrollToSelection(enabled ? 'center' : 'nearest');
+  notifyEditorConfigChange('typewriterMode', enabled);
 }
 
 export function setFocusMode(enabled: boolean) {
   window.config.focusMode = enabled;
   styling.setFocusMode(enabled);
+  notifyEditorConfigChange('focusMode', enabled);
 }
 
 export function setLineWrapping(enabled: boolean) {
   window.config.lineWrapping = enabled;
   styling.setLineWrapping(enabled);
+  notifyEditorConfigChange('lineWrapping', enabled);
 }
 
 export function setLineHeight(lineHeight: number) {
@@ -109,27 +129,38 @@ export function setLineHeight(lineHeight: number) {
   if (window.config.showActiveLineIndicator) {
     refreshEditFocus();
   }
+
+  notifyEditorConfigChange('lineHeight', lineHeight);
 }
 
 export function setDefaultLineBreak(lineBreak?: string) {
   window.config.defaultLineBreak = lineBreak;
+  notifyEditorConfigChange('defaultLineBreak', lineBreak);
 }
 
 export function setIndentUnit(unit: string) {
   window.config.indentUnit = unit;
-
   tryGetEditor()?.dispatch({
     effects: window.dynamics.indentUnit?.reconfigure(indentUnit.of(unit)),
   });
+
+  notifyEditorConfigChange('indentUnit', unit);
 }
 
 export function setTabKeyBehavior(behavior: TabKeyBehavior) {
   window.config.tabKeyBehavior = behavior as CodeGen_Int;
+  notifyEditorConfigChange('tabKeyBehavior', behavior as CodeGen_Int);
 }
 
 export function setSuggestWhileTyping(enabled: boolean) {
   window.config.suggestWhileTyping = enabled;
   completion.invalidateCache();
+  notifyEditorConfigChange('suggestWhileTyping', enabled);
+}
+
+export function setSmartQuotesEnabled(enabled: boolean) {
+  window.config.smartQuotesEnabled = enabled;
+  notifyEditorConfigChange('smartQuotesEnabled', enabled);
 }
 
 export function recalculateTextMetrics() {

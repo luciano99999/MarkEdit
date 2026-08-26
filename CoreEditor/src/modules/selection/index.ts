@@ -1,6 +1,7 @@
 import { EditorView } from '@codemirror/view';
-import { EditorSelection, Line, SelectionRange } from '@codemirror/state';
+import { ChangeSpec, EditorSelection, Line, SelectionRange, TransactionSpec } from '@codemirror/state';
 import { selectAll as selectAllCommand } from '@codemirror/commands';
+import { isComposing } from '../../common/store';
 import { isReleaseMode } from '../../common/utils';
 import { almostEqual, afterDomUpdate, getClientRect } from '../../common/utils';
 
@@ -23,6 +24,23 @@ export const caretScrollDefaults: { y: ScrollStrategy; yMargin: number } = {
   y: 'end',
   yMargin: 55,
 };
+
+/**
+ * Apply changes to the editor without scrolling the viewport.
+ */
+export function applyChangesNoScroll(
+  changes: ChangeSpec,
+  spec: Omit<TransactionSpec, 'changes' | 'effects' | 'scrollIntoView' | 'userEvent'> = {},
+) {
+  const editor = window.editor;
+  const changeSet = editor.state.changes(changes);
+  editor.dispatch({
+    ...spec,
+    changes: changeSet,
+    effects: editor.scrollSnapshot().map(changeSet) ?? [],
+    userEvent: '@none',
+  });
+}
 
 /**
  * Reverse ranges for multi-selection to keep indices correct when updating.
@@ -199,8 +217,14 @@ export function updateActiveLine(hasSelection: boolean) {
 
 /**
  * Refresh the current focus to force a render pass.
+ *
+ * Skipped during composition because dispatching a selection aborts it, unless explicitly allowed.
  */
-export function refreshEditFocus() {
+export function refreshEditFocus(allowWhileComposing = false) {
+  if (!allowWhileComposing && isComposing()) {
+    return;
+  }
+
   const editor = window.editor;
   editor.dispatch({
     selection: editor.state.selection,
