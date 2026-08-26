@@ -1,5 +1,20 @@
 # Change Log
 
+## 2026-08-26
+**Session**: Aggiornamento alla versione v1.34.0 e chiarimento estensione MarkEdit-preview (Conversation ID: bd9ab005-1059-40b6-bc85-7b8cde0c366a)
+
+**Work Done**:
+- **Aggiornamento Upstream**: Eseguito il merge dei commit upstream (73 nuovi commit) da `origin/main` (tag **v1.34.0**) nel branch `feature/italian-localization`.
+- **Risoluzione Conflitti & Localizzazione**: Risolti i conflitti di merge nei cataloghi `.xcstrings` preservando tutte le traduzioni e aggiungendo le nuove stringhe in italiano (25 nuove chiavi totali tra `Localizable.xcstrings`, `Main.xcstrings` e `QuickLookMac/Localizable.xcstrings`), raggiungendo il **100%** di copertura per le nuove funzionalità (Extension Manager, In-app Updater, Quick Look, Modalità sicura).
+- **Build & Installazione**: Compilata l'applicazione sia in `Debug` che in `Release` con successo ed installata la nuova build **MarkEdit v1.34.0** in `/Applications/MarkEdit.app`.
+
+**Key Changes**:
+- Integrazione completa del nuovo Extension Manager con ricerca e installazione estensioni/temi, nuovo In-app Updater e nuovo modulo Quick Look.
+- Copertura di localizzazione italiana al 100% per tutte le 466 stringhe complessive dell'app.
+
+**Outcome**:
+- MarkEdit.app v1.34.0 installato in `/Applications/` e funzionante in italiano.
+
 ## 2026-07-22
 **Session**: Aggiornamento alla versione v1.33.1 (Conversation ID: 0a95585e-6420-43d9-9097-36553dbfa08e)
 
