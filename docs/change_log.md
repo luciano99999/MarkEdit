@@ -1,5 +1,23 @@
 # Change Log
 
+## 2026-10-23
+**Session**: Aggiornamento alla versione v1.37.0 (Conversation ID: deaf1e8a-4995-4d02-8e54-6b12209ddd1c)
+
+**Work Done**:
+- **Aggiornamento Upstream**: Eseguito il merge dei commit upstream (116 nuovi commit da `origin/main`, coprendo v1.35.0, v1.36.0 e v1.37.0) nel branch `feature/italian-localization`.
+- **Risoluzione Conflitti & Localizzazione**: Risolti i conflitti nei cataloghi `.xcstrings` (`Localizable.xcstrings` e `Main.xcstrings`), preservando le traduzioni esistenti e traducendo integralmente tutte le 34 nuove chiavi e le modifiche (Quick Search, Segnalibri/Bookmarks, credenziali estensioni, filtri di ricerca, ecc.), mantenendo la copertura di localizzazione italiana al **100%** (299/299 in `Localizable.xcstrings` e 198/198 in `Main.xcstrings`).
+- **Retrocompatibilità SDK macOS 27 / Xcode 26**: Ripristinati shim e controlli condizionali per le API native introdotte dall'upstream con l'SDK di Xcode 27 (`preferredImageVisibility`, `FoundationModels`, gesture in `TextCompletionView`, gesture in `QuickLook` e pull-to-refresh in `ExtensionsViewController`), garantendo la compilazione senza errori su Xcode 26.6 e versioni successive.
+- **Frontend CoreEditor**: Eseguito `yarn install`, `yarn build` (generando il bundle singlefile `dist/index.html`) e verificati con successo tutti i 474 test unitari (33 test suite passate).
+- **Build & Installazione**: Compilata l'applicazione nativa in configurazione `Release` con `xcodebuild` ed installata con successo la nuova versione **MarkEdit v1.37.0** in `/Applications/MarkEdit.app`.
+
+**Key Changes**:
+- Integrazione completa delle novità di v1.35.0, v1.36.0 e v1.37.0 (Quick Search, Bookmarks di file/cartelle, nuove API per estensioni, supporto touch e miglioramenti macOS Golden Gate).
+- Traduzione al 100% in italiano di tutte le nuove voci di menu, filtri di ricerca e messaggi di autorizzazione.
+- Aggiornato bundle applicativo in `/Applications/MarkEdit.app`.
+
+**Outcome**:
+- MarkEdit.app v1.37.0 installato e perfettamente funzionante con localizzazione italiana completa.
+
 ## 2026-08-26
 **Session**: Aggiornamento alla versione v1.34.0 e chiarimento estensione MarkEdit-preview (Conversation ID: bd9ab005-1059-40b6-bc85-7b8cde0c366a)
 
