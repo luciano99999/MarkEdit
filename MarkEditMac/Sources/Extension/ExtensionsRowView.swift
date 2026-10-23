@@ -18,8 +18,6 @@ struct ExtensionsRowView: View {
   let rowMargin: Double
   let rowHeightChanged: () -> Void
 
-  @State private var showingUpdatePopover = false
-
   var body: some View {
     // Read live state so the cell animates its own updates instead of being reloaded
     let item = liveItem
@@ -41,29 +39,21 @@ struct ExtensionsRowView: View {
           .lineLimit(1)
 
           if item.isFeatured, model.mode == .discover {
-            if #available(macOS 15.1, *) {
-              HStack(spacing: 4) {
-                Image(systemName: Icons.laurelLeading)
-                  .bold()
-                  .foregroundStyle(LinearGradient.spectrum(direction: .leftToRight))
-                  .accessibilityHidden(true)
-
-                Text(Localized.Extension.featured)
-                  .font(.callout)
-                  .fontDesign(.serif)
-                  .foregroundStyle(.secondary)
-
-                Image(systemName: Icons.laurelTrailing)
-                  .bold()
-                  .foregroundStyle(LinearGradient.spectrum(direction: .rightToLeft))
-                  .accessibilityHidden(true)
-              }
-            } else {
-              Image(systemName: "rosette")
+            HStack(spacing: 4) {
+              Image(systemName: Icons.laurelLeading)
                 .bold()
-                .foregroundStyle(.orange)
-                .help(Localized.Extension.featured)
-                .accessibilityLabel(Localized.Extension.featured)
+                .foregroundStyle(LinearGradient.spectrum(direction: .leftToRight))
+                .accessibilityHidden(true)
+
+              Text(Localized.Extension.featured)
+                .font(.callout)
+                .fontDesign(.serif)
+                .foregroundStyle(.secondary)
+
+              Image(systemName: Icons.laurelTrailing)
+                .bold()
+                .foregroundStyle(LinearGradient.spectrum(direction: .rightToLeft))
+                .accessibilityHidden(true)
             }
           }
 
@@ -95,9 +85,9 @@ struct ExtensionsRowView: View {
 
         if item.category == .theme, let patterns = item.colorPatterns, !patterns.isEmpty {
           ThemePreview(patterns: patterns, showsBothSchemes: item.colorScheme == .both)
-          // Centered vertically between subtitle and metadata
+            // Centered vertically between subtitle and metadata
             .padding(.top, 12)
-          // Decorative illustration; the row already conveys the theme textually
+            // Decorative illustration; the row already conveys the theme textually
             .accessibilityHidden(true)
         }
 
@@ -130,13 +120,10 @@ struct ExtensionsRowView: View {
     .background(
       // Rounded for the drag preview; invisible at rest since it matches the content background
       RoundedRectangle(cornerRadius: 8)
-        .fill(Self.contentBackgroundStyle)
+        .fill(.windowBackground)
     )
     // Fresh identity per mode and item so tab switches and cell reuse reset row state
     .id("\(model.mode):\(item.id)")
-    .onChange(of: listInteraction.scrollGeneration) {
-      showingUpdatePopover = false
-    }
   }
 
   var sizingSubtitleText: String? {
@@ -160,14 +147,6 @@ struct ExtensionsRowView: View {
 // MARK: - Private
 
 private extension ExtensionsRowView {
-  static var contentBackgroundStyle: AnyShapeStyle {
-    if #available(macOS 26.0, *) {
-      return .init(.windowBackground)
-    }
-
-    return .init(Color(.finderContentBackground))
-  }
-
   /// Live snapshot of this item, falling back to the initial value if it's no longer listed.
   var liveItem: ExtensionsModel.Item {
     model.liveItem(id: item.id) ?? item
@@ -185,6 +164,17 @@ private extension ExtensionsRowView {
 
   var showingUpdateInline: Bool {
     listInteraction.inlineUpdateItemIDs.contains(item.id)
+  }
+
+  var showingUpdatePopover: Bool {
+    get { listInteraction.updatePopoverItemID == item.id }
+    nonmutating set {
+      if newValue {
+        listInteraction.updatePopoverItemID = item.id
+      } else if listInteraction.updatePopoverItemID == item.id {
+        listInteraction.updatePopoverItemID = nil
+      }
+    }
   }
 
   func subtitle(_ text: String) -> some View {
@@ -328,6 +318,7 @@ private extension ExtensionsRowView {
       Text(notes)
         .font(.body)
         .textSelection(.enabled)
+        .lineLimit(nil)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.bottom, 16)
 
@@ -408,7 +399,7 @@ private extension ExtensionsRowView {
           .font(.callout)
           .fontWeight(.medium)
           .foregroundStyle(.tint)
-          .popover(isPresented: $showingUpdatePopover, arrowEdge: .bottom) {
+          .popover(isPresented: .init(get: { showingUpdatePopover }, set: { showingUpdatePopover = $0 }), arrowEdge: .bottom) {
             updateNotesPopover(notes, releaseDate: item.releaseDate, releaseURL: item.releasePageURL)
           }
           .onDisappear {

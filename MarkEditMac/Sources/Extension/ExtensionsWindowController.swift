@@ -19,16 +19,19 @@ final class ExtensionsWindowController: NSWindowController {
   private weak var updateAllItem: NSMenuItem?
   private weak var updateBehaviorMenu: NSMenu?
 
-  func present(scrollTo target: ExtensionsScrollTarget? = nil) {
+  func present(mode: ExtensionsModel.Mode? = nil, scrollTo target: ExtensionsScrollTarget? = nil) {
     if !AppPreferences.Extensions.windowHasBeenOpened {
       AppPreferences.Extensions.windowHasBeenOpened = true
       ExtensionUpdater.requestMenuUpdate()
     }
 
-    let canRevealImmediately = target.map(model.hasDiscoverItem) ?? false
-    if canRevealImmediately {
-      prepareToRevealTarget()
+    if mode != nil || target != nil {
+      prepareToRevealTarget(mode: mode ?? .discover)
     }
+
+    let canRevealImmediately = target.map {
+      model.items.contains(where: $0.matches)
+    } ?? false
 
     showWindow(nil)
     window?.makeKeyAndOrderFront(nil)
@@ -45,7 +48,7 @@ final class ExtensionsWindowController: NSWindowController {
       await model.load(forceRefresh: true)
 
       if let target {
-        prepareToRevealTarget()
+        prepareToRevealTarget(mode: mode ?? .discover)
         extensionsVC?.reveal(target)
       }
     }
@@ -66,11 +69,6 @@ final class ExtensionsWindowController: NSWindowController {
 // MARK: - Responder Chain
 
 extension ExtensionsWindowController {
-  // The main menu binds "Select All" to `selectWholeDocument(_:)`
-  @IBAction func selectWholeDocument(_ sender: Any?) {
-    NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: sender)
-  }
-
   // The main menu binds "Find" (Cmd-F) to `startFind(_:)`; focus the toolbar search field
   @IBAction func startFind(_ sender: Any?) {
     searchToolbarItem?.beginSearchInteraction()
@@ -82,7 +80,7 @@ extension ExtensionsWindowController {
 extension ExtensionsWindowController: NSMenuDelegate {
   func menuNeedsUpdate(_ menu: NSMenu) {
     let count = model.installableUpdateCount
-    updateAllItem?.isEnabled = count > 0
+    updateAllItem?.isEnabled = count > 0 && extensionsVC?.isBusyRefreshing() != true
     updateAllItem?.title = count > 0 ? "\(Localized.Extension.updateAll) (\(count))" : Localized.Extension.updateAll
     refreshUpdateSettingChecks()
   }
@@ -162,10 +160,10 @@ private extension ExtensionsWindowController {
     window?.toolbar?.items.first { $0.itemIdentifier == .search } as? NSSearchToolbarItem
   }
 
-  /// Clears filtering and selects Discover before a programmatic reveal.
-  func prepareToRevealTarget() {
-    if model.mode != .discover {
-      model.mode = .discover
+  /// Clears filtering and selects the requested mode before a programmatic reveal.
+  func prepareToRevealTarget(mode: ExtensionsModel.Mode) {
+    if model.mode != mode {
+      model.mode = mode
     }
 
     if !model.searchQuery.isEmpty {
@@ -235,12 +233,8 @@ private extension ExtensionsWindowController {
     group.label = Localized.Extension.windowTitle
 
     // [macOS 27] Use "tabs" role, the default style has vertical dividers
-    if #available(macOS 27.0, *), group.responds(to: sel_getUid("setRole:")) {
-    #if canImport(FoundationModels, _version: 2)
+    if #available(macOS 27.0, *) {
       group.role = .tabs
-    #else
-      group.setValue(1, forKey: "role") // .tabs
-    #endif
     }
 
     modeControl = group

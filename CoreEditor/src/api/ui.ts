@@ -1,9 +1,10 @@
-import { MenuItem, MenuItemState, Alert, TextBox, SavePanelOptions } from 'markedit-api';
+import { EditorView } from '@codemirror/view';
+import { MenuItem, MenuItemState, ContextMenuOptions, Alert, TextBox, OpenPanelOptions, PrintPanelOptions, SavePanelOptions } from 'markedit-api';
 
 import { WebMenuItem } from '../@types/WebMenuItem';
 import { WebPoint } from '../@types/WebPoint';
-import { afterDomUpdate } from '../common/utils';
-import { getRect, scrollToSelection, isPositionVisible } from '../modules/selection';
+import { afterDomUpdate, focusedEditor, getClientRect } from '../common/utils';
+import { scrollToSelection, isPositionVisible } from '../modules/selection';
 
 export type { MenuItemState };
 
@@ -14,26 +15,41 @@ export function addMainMenuItem(spec: MenuItem | MenuItem[]): void {
   });
 }
 
-export function showContextMenu(items: MenuItem[], location?: WebPoint) {
-  const caretPos = window.editor.state.selection.main.head;
+export function showContextMenu(items: MenuItem[], location?: WebPoint, options?: ContextMenuOptions) {
+  let { highlightedIndex } = options ?? {};
+  if (highlightedIndex !== undefined && !Number.isSafeInteger(highlightedIndex)) {
+    console.error('showContextMenu: highlightedIndex must be a safe integer.', highlightedIndex);
+    highlightedIndex = undefined;
+  }
+
+  const editor = focusedEditor() ?? window.editor;
+  const caretPos = editor.state.selection.main.head;
   const invokeNative = () => {
     window.nativeModules.api.showContextMenu({
       items: items.map(item => createMenuItem(item, contextActions)),
+      highlightedIndex: highlightedIndex === undefined ? undefined : (highlightedIndex as CodeGen_Int),
       location: location ?? (() => {
-        const rect = getRect(caretPos);
-        if (rect === undefined) {
+        const coords = editor.coordsAtPos(caretPos);
+        if (coords === null) {
           // Basically invalid, it should not happen
           return { x: 0, y: 0 };
         }
 
         // Default value set to the caret position
+        const rect = getClientRect(coords);
         return { x: rect.x, y: rect.y + rect.height + 10 };
       })(),
     });
   };
 
-  if (location === undefined && !isPositionVisible(caretPos)) {
-    scrollToSelection('nearest');
+  // Nested carets may be clipped by any intervening scroll container
+  if (location === undefined && (editor !== window.editor || !isPositionVisible(caretPos))) {
+    if (editor === window.editor) {
+      scrollToSelection('nearest');
+    } else {
+      editor.dispatch({ effects: EditorView.scrollIntoView(caretPos, { x: 'nearest', y: 'nearest' }) });
+    }
+
     afterDomUpdate(invokeNative);
   } else {
     invokeNative();
@@ -50,8 +66,20 @@ export function showTextBox(spec?: TextBox): Promise<string | undefined> {
   return window.nativeModules.api.showTextBox(textBox ?? {});
 }
 
+export function showOpenPanel(options?: OpenPanelOptions): Promise<string[] | undefined> {
+  return window.nativeModules.api.showOpenPanel({ options: options ?? {} });
+}
+
 export function showSavePanel(options: SavePanelOptions): Promise<boolean> {
   return window.nativeModules.api.showSavePanel({ options });
+}
+
+export function showPrintPanel(options: PrintPanelOptions): Promise<boolean> {
+  if (!isSupportedPrintType(options.type)) {
+    return Promise.reject(new Error(`Unsupported print content type: ${options.type}`));
+  }
+
+  return window.nativeModules.api.showPrintPanel({ options });
 }
 
 export function runService(name: string, input?: string): Promise<boolean> {
@@ -109,6 +137,10 @@ function createMenuItem(item: MenuItem, actions: Map<string, ActionType>): WebMe
     children: item.children?.map(item => createMenuItem(item, actions)),
   };
 };
+
+function isSupportedPrintType(type: string): boolean {
+  return type === 'pdf';
+}
 
 type ActionType = () => void | MenuItemState;
 const mainActions = new Map<string, ActionType>();

@@ -38,14 +38,6 @@ public extension NSPasteboard {
   }
 
   func url() async -> String? {
-    guard #available(macOS 15.4, *) else {
-      guard let string else {
-        return string(forType: .URL)
-      }
-
-      return NSDataDetector.extractURL(from: string)
-    }
-
     // This alerts the user only when the pasteboard really contains links
     let values = try? await Self.general.detectedValues(for: [\.links])
     return values?.links.first?.url.absoluteString
@@ -120,11 +112,11 @@ private extension String {
     //
     // Order matters; it may not be the fastest, but it's easy to understand.
     var output = self
-    output = output.replacingOccurrences(of: "\r\n", with: "\n")
-    output = output.replacingOccurrences(of: "\r", with: "\n")
+    output = output.replacingOccurrences(of: "\r\n", with: "\n", options: .literal)
+    output = output.replacingOccurrences(of: "\r", with: "\n", options: .literal)
 
     if lineBreak != "\n" {
-      output = output.replacingOccurrences(of: "\n", with: lineBreak)
+      output = output.replacingOccurrences(of: "\n", with: lineBreak, options: .literal)
     }
 
     return output

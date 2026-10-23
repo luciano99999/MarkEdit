@@ -1,10 +1,14 @@
-import { describe, expect, test, beforeEach } from '@jest/globals';
+import { describe, expect, jest, test, beforeEach, afterEach } from '@jest/globals';
 import { EditorSelection } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { Config } from '../src/config';
-import { performTextDrop, resetEditor } from '../src/core';
+import { performTextDrop, resetEditor, restoreFocus } from '../src/core';
 import { editingState } from '../src/common/store';
 import { tryGetEditor } from '../src/common/utils';
+import { caretScrollDefaults } from '../src/modules/selection';
+import { undo, redo } from '../src/@vendor/commands/history';
 import normalizeSelection from '../src/modules/selection/normalizeSelection';
+import * as styling from '../src/styling/config';
 
 // Minimal config
 window.config = {
@@ -22,6 +26,66 @@ window.config = {
   invisiblesBehavior: 'never',
   indentBehavior: 'never',
 } as Config;
+
+describe('restoreFocus', () => {
+  let nestedEditor: EditorView | undefined;
+
+  beforeEach(async () => {
+    tryGetEditor()?.destroy();
+    document.body.innerHTML = '';
+    await resetEditor('Main document', { anchor: 1, head: 4 });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    nestedEditor?.destroy();
+    nestedEditor = undefined;
+    window.editor.destroy();
+    document.body.innerHTML = '';
+  });
+
+  test('refocuses the owning editor, including nested editors', () => {
+    const editor = window.editor;
+    const widget = document.createElement('div');
+    widget.contentEditable = 'false';
+    editor.contentDOM.appendChild(widget);
+    nestedEditor = new EditorView({ doc: 'Table cell', selection: { anchor: 1, head: 3 }, parent: widget });
+
+    for (const owner of [nestedEditor, editor]) {
+      owner.focus();
+      const focus = jest.spyOn(owner, 'focus');
+      const selection = owner.state.selection;
+      owner.scrollDOM.scrollTop = 50;
+      document.getSelection()?.removeAllRanges();
+      document.dispatchEvent(new Event('selectionchange'));
+
+      restoreFocus();
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(owner.contentDOM);
+      expect(owner.state.selection).toEqual(selection);
+      expect(owner.scrollDOM.scrollTop).toBe(50);
+      expect(document.getSelection()?.toString()).toBe(owner.state.sliceDoc(selection.main.from, selection.main.to));
+      focus.mockRestore();
+    }
+  });
+
+  test('preserves input focus and selection without focusing the editor', () => {
+    const input = document.createElement('input');
+    input.value = 'Query';
+    window.editor.dom.appendChild(input);
+    input.focus();
+    input.setSelectionRange(1, 3);
+
+    const focus = jest.spyOn(input, 'focus');
+    const editorFocus = jest.spyOn(window.editor, 'focus');
+
+    restoreFocus();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(editorFocus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3]);
+  });
+});
 
 describe('Selection clamping logic', () => {
   const doc = 'Hello, World!'; // length = 13
@@ -75,6 +139,26 @@ describe('resetEditor selection', () => {
     document.body.innerHTML = '';
   });
 
+  test('configured history beeps only when undo or redo fails', async () => {
+    const api = window.nativeModules.api;
+    const playSystemBeep = jest.fn();
+    window.nativeModules.api = { ...api, playSystemBeep };
+
+    try {
+      await resetEditor('Hello, World!');
+      expect(undo(window.editor)).toBe(false);
+      expect(redo(window.editor)).toBe(false);
+      expect(playSystemBeep).toHaveBeenCalledTimes(2);
+
+      window.editor.dispatch({ changes: { from: 0, insert: 'Hi! ' } });
+      expect(undo(window.editor)).toBe(true);
+      expect(redo(window.editor)).toBe(true);
+      expect(playSystemBeep).toHaveBeenCalledTimes(2);
+    } finally {
+      window.nativeModules.api = api;
+    }
+  });
+
   test('without selection range, cursor is at 0', async () => {
     await resetEditor('Hello, World!');
     const sel = window.editor.state.selection.main;
@@ -122,6 +206,103 @@ describe('resetEditor selection', () => {
     const content = 'Hello, MarkEdit!';
     await resetEditor(content, { anchor: 0, head: 5 });
     expect(window.editor.state.doc.toString()).toBe(content);
+  });
+});
+
+describe('resetEditor caret scrolling', () => {
+  beforeEach(() => {
+    tryGetEditor()?.destroy();
+    document.body.innerHTML = '';
+  });
+
+  test.each([
+    { anchor: 5, head: 5, expectedHead: 5 },
+    { anchor: 10, head: 3, expectedHead: 3 },
+    { anchor: 100, head: 200, expectedHead: 13 },
+  ])('requests initial scrolling and reapplies the caret margin after styling for $anchor -> $head', async ({ anchor, head, expectedHead }) => {
+    const scrollIntoView = jest.spyOn(EditorView, 'scrollIntoView');
+    const setUp = jest.spyOn(styling, 'setUp');
+    const update = jest.spyOn(EditorView.prototype, 'update');
+
+    try {
+      await resetEditor('Hello, World!', { anchor, head });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith(expectedHead, caretScrollDefaults);
+      expect(scrollIntoView.mock.invocationCallOrder[0]).toBeLessThan(setUp.mock.invocationCallOrder[0]);
+
+      const initialScroll = scrollIntoView.mock.results[0].value;
+      const scrollUpdate = update.mock.calls.findIndex(([transactions]) =>
+        transactions.some(transaction => transaction.effects.some(effect => effect === initialScroll)),
+      );
+
+      expect(scrollUpdate).toBeGreaterThanOrEqual(0);
+      expect(update.mock.invocationCallOrder[scrollUpdate]).toBeGreaterThan(setUp.mock.invocationCallOrder[0]);
+    } finally {
+      scrollIntoView.mockRestore();
+      setUp.mockRestore();
+      update.mockRestore();
+    }
+  });
+
+  test('does not scroll to the caret when preserving a saved offset', async () => {
+    await resetEditor('Hello, World!', { anchor: 5, head: 5 });
+    window.editor.scrollDOM.scrollTop = 100;
+    const scrollIntoView = jest.spyOn(EditorView, 'scrollIntoView');
+    const scrollTo = jest.spyOn(HTMLElement.prototype, 'scrollTo');
+
+    try {
+      await resetEditor('Hello, World!', undefined, false);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(scrollTo.mock.calls.map(call => call[0])).toContainEqual({ top: 100, left: 0 });
+    } finally {
+      scrollIntoView.mockRestore();
+      scrollTo.mockRestore();
+    }
+  });
+});
+
+describe('scrollbar mouse handling', () => {
+  beforeEach(async () => {
+    tryGetEditor()?.destroy();
+    document.body.innerHTML = '';
+    await resetEditor('Hello, World!');
+
+    const scroller = window.editor.scrollDOM;
+    Object.defineProperty(scroller, 'clientWidth', { configurable: true, value: 500 });
+  });
+
+  test.each([
+    { tagName: 'div', clientX: 326 },
+    { tagName: 'span', clientX: 326 },
+    { tagName: 'div', clientX: 490 },
+    { tagName: 'span', clientX: 490 },
+  ])('does not cancel clicks on a nested cell $tagName at $clientX', ({ tagName, clientX }) => {
+    const cell = document.createElement(tagName);
+    cell.contentEditable = 'true';
+    Object.defineProperty(cell, 'clientWidth', { value: 87 });
+    window.editor.scrollDOM.appendChild(cell);
+
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX });
+    cell.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    cell.remove();
+  });
+
+  test.each([
+    { direction: 'ltr', clientX: 484, prevented: false },
+    { direction: 'ltr', clientX: 485, prevented: false },
+    { direction: 'ltr', clientX: 486, prevented: true },
+    { direction: 'rtl', clientX: 14, prevented: true },
+    { direction: 'rtl', clientX: 15, prevented: false },
+    { direction: 'rtl', clientX: 16, prevented: false },
+  ])('preserves direct $direction scrollbar handling at $clientX', ({ direction, clientX, prevented }) => {
+    const scroller = window.editor.scrollDOM;
+    scroller.dir = direction;
+
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX });
+    scroller.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(prevented);
   });
 });
 
@@ -213,14 +394,18 @@ describe('resetEditor documentChanged', () => {
     expect(sel.head).toBe(0);
   });
 
-  test('same-document reset overrides caller-provided selectionRange with the live caret', async () => {
+  test('same-document reset uses and scrolls to a caller-provided zero selectionRange', async () => {
     await resetEditor('Hello, World!');
     window.editor.dispatch({ selection: EditorSelection.range(3, 8) });
+    window.editor.scrollDOM.scrollTop = 100;
+    const scrollTo = jest.spyOn(HTMLElement.prototype, 'scrollTo');
 
     await resetEditor('Hello, World!', { anchor: 0, head: 0 }, false);
     const sel = window.editor.state.selection.main;
-    expect(sel.anchor).toBe(3);
-    expect(sel.head).toBe(8);
+    expect(sel.anchor).toBe(0);
+    expect(sel.head).toBe(0);
+    expect(scrollTo.mock.calls.map(call => call[0])).toContainEqual({ top: 0 });
+    scrollTo.mockRestore();
   });
 
   test('documentChanged=true ignores the live caret and uses provided range', async () => {

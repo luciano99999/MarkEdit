@@ -5,6 +5,7 @@
 //
 
 import Foundation
+import MarkEditCore
 import UniformTypeIdentifiers
 
 public extension URL {
@@ -30,11 +31,17 @@ public extension URL {
       return false
     }
 
-    if suggestedFileType?.conforms(to: .text) ?? true {
+    let type = suggestedFileType
+    if type?.conforms(to: .text) == true {
       return false
     }
 
-    return true
+    let isTypeless = pathExtension.isEmpty && (type == nil || type == .data || type?.isDynamic == true)
+    if isTypeless, let binarySample {
+      return binarySample.isProbablyBinary
+    }
+
+    return type != nil
   }
 
   var isImageFile: Bool {
@@ -71,6 +78,29 @@ public extension URL {
   func replacingPathExtension(_ pathExtension: String) -> URL {
     deletingPathExtension().appendingPathExtension(pathExtension)
   }
+
+  /// A compact filename, disambiguated with parent components when needed.
+  func displayTitle(among urls: [URL]) -> String {
+    let name = lastPathComponent
+    let peers = urls.filter {
+      $0 != self && $0.lastPathComponent == name
+    }
+
+    guard !peers.isEmpty else {
+      return name.truncatedForDisplay()
+    }
+
+    let components = pathComponents
+    var depth = 2
+    while depth < components.count && (peers.contains {
+      $0.pathComponents.suffix(depth).elementsEqual(components.suffix(depth))
+    }) {
+      depth += 1
+    }
+
+    let parent = NSString.path(withComponents: Array(components.dropLast().suffix(depth - 1)))
+    return "\(name) \u{2014} \(parent)".truncatedForDisplay()
+  }
 }
 
 // MARK: - Private
@@ -86,6 +116,20 @@ private extension URL {
     }
 
     return UTType(filenameExtension: pathExtension)
+  }
+
+  var binarySample: Data? {
+    guard (try? resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true,
+          let handle = try? FileHandle(forReadingFrom: self) else {
+      return nil
+    }
+
+    defer { try? handle.close() }
+    do {
+      return try handle.read(upToCount: 512) ?? Data()
+    } catch {
+      return nil
+    }
   }
 }
 

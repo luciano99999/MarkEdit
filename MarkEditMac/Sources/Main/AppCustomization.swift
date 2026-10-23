@@ -64,15 +64,20 @@ struct AppCustomization {
     stylesDirectory.createFile()
     editorScript.createFile()
     scriptsDirectory.createFile()
-    debugDirectory.createFile()
     pandoc.createFile("from: gfm\nstandalone: true\npdf-engine: context\n")
     statisticsRules.createFile("[]")
     settings.createFile(AppRuntimeConfig.defaultContents)
     extensions.createFile(ExtensionConfig.defaultContents)
+
+    if AppRuntimeConfig.disableDebugFiles {
+      try? FileManager.default.removeItem(at: debugDirectory.fileURL)
+    } else {
+      debugDirectory.createFile()
+    }
   }
 
   var fileURL: URL {
-    URL.documentsDirectory.appending(
+    ApplicationEnvironment.documentsDirectory.appending(
       path: fileType.fileName,
       directoryHint: fileType.isDirectory ? .isDirectory : .notDirectory
     ).resolvingSymbolicLink
@@ -87,11 +92,28 @@ struct AppCustomization {
       .compactMap { createContents(url: $0.resolvingSymbolicLink) }
   }
 
-  func contentsFrom(fileNames: [String]) -> [String] {
-    fileNames
-      .filter { isSafeFileName($0) }
-      .map { fileURL.appending(path: $0, directoryHint: .notDirectory).resolvingSymbolicLink }
-      .compactMap { createContents(url: $0) }
+  static func userScripts() -> [(id: String, path: String, source: String)] {
+    guard !isSafeMode else {
+      return []
+    }
+
+    let scripts = [(id: "local:editor.js", url: editorScript.fileURL)] + ExtensionConfig.installed
+      .filter { $0.enabled != false && scriptsDirectory.isSafeFileName($0.file) }
+      .map { entry in
+        (id: entry.id, url: scriptsDirectory.fileURL.appending(path: entry.file).resolvingSymbolicLink)
+      }
+
+    return scripts.compactMap { script in
+      guard let source = editorScript.createContents(url: script.url) else {
+        return nil
+      }
+
+      return (
+        script.id,
+        script.url.path(percentEncoded: false),
+        source
+      )
+    }
   }
 
   // MARK: - Private
@@ -145,16 +167,16 @@ extension AppCustomization {
   private static let safeModeKey = "launch-safe-mode"
 
   static let isSafeMode: Bool = {
-    let enabled = UserDefaults.standard.bool(forKey: safeModeKey)
-    UserDefaults.standard.removeObject(forKey: safeModeKey)
+    let enabled = ApplicationEnvironment.preferences.bool(forKey: safeModeKey)
+    ApplicationEnvironment.preferences.removeObject(forKey: safeModeKey)
     return enabled
   }()
 
   static func requestSafeMode() {
-    UserDefaults.standard.set(true, forKey: safeModeKey)
+    ApplicationEnvironment.preferences.set(true, forKey: safeModeKey)
   }
 
   static func cancelSafeMode() {
-    UserDefaults.standard.removeObject(forKey: safeModeKey)
+    ApplicationEnvironment.preferences.removeObject(forKey: safeModeKey)
   }
 }

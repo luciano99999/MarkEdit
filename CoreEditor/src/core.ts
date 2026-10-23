@@ -2,7 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { extensions } from './extensions';
 import { globalState, editingState } from './common/store';
-import { tryGetEditor, almostEqual, afterDomUpdate, getViewportScale, isReleaseMode, isMotionReduced } from './common/utils';
+import { tryGetEditor, focusedEditor, almostEqual, afterDomUpdate, getViewportScale, isReleaseMode, isMotionReduced } from './common/utils';
 
 import hasSelection from './modules/selection/hasSelection';
 import normalizeSelection from './modules/selection/normalizeSelection';
@@ -61,9 +61,9 @@ export async function resetEditor(
   selectionRange?: { anchor: number; head: number },
   documentChanged: boolean = true,
 ): Promise<boolean> {
-  // Used to restore the scroll position if the document is not changed
+  // Preserve scroll position for same-document resets without an explicit range
   const previousOffset = (() => {
-    if (documentChanged) {
+    if (documentChanged || selectionRange !== undefined) {
       return undefined;
     }
 
@@ -75,8 +75,8 @@ export async function resetEditor(
     return { top: scrollDOM.scrollTop, left: scrollDOM.scrollLeft };
   })();
 
-  // Used to restore the selection if the document is not changed
-  if (!documentChanged) {
+  // Preserve selection for same-document resets without an explicit range
+  if (!documentChanged && selectionRange === undefined) {
     selectionRange = tryGetEditor()?.state.selection.main;
   }
 
@@ -84,6 +84,9 @@ export async function resetEditor(
   const initialDoc = normalizeLineBreaks(initialContent, lineBreak);
   const initialSelection = normalizeSelection(initialDoc.length, selectionRange);
   const selectionRestored = selectionRange !== undefined && (selectionRange.anchor !== 0 || selectionRange.head !== 0);
+  const initialScroll = (selectionRestored && previousOffset === undefined)
+    ? EditorView.scrollIntoView(initialSelection.head, caretScrollDefaults)
+    : undefined;
 
   // Honest flag, set before the view so extensions don't need an extra reconfigure pass
   editingState.hasSelection = !initialSelection.empty;
@@ -96,10 +99,7 @@ export async function resetEditor(
       extensions: extensions({ lineBreak }),
     }),
     parent: document.querySelector('#editor') ?? document.body,
-    // Initial scroll to avoid an extra transaction
-    scrollTo: (selectionRestored && previousOffset === undefined)
-      ? EditorView.scrollIntoView(initialSelection.head, caretScrollDefaults)
-      : undefined,
+    scrollTo: initialScroll,
   });
 
   const editor = window.editor;
@@ -169,6 +169,11 @@ export async function resetEditor(
   // Reconfigure, window.config might have changed
   setUp(window.config, loadTheme(window.config.theme).colors);
 
+  // Reapply the caret margin because styling can change the initial scroll geometry
+  if (initialScroll !== undefined) {
+    editor.dispatch({ effects: initialScroll });
+  }
+
   applyReducedMotion(isMotionReduced());
   observeBackgroundColorChanges(editor.dom);
   afterDomUpdate(notifyBackgroundColor);
@@ -214,9 +219,10 @@ export async function resetEditor(
 }
 
 export function getEditorState() {
+  const editor = focusedEditor();
   return {
-    hasFocus: window.editor.hasFocus,
-    hasSelection: hasSelection(),
+    hasFocus: editor !== null,
+    hasSelection: editor === null ? hasSelection() : editor.state.selection.ranges.some(range => !range.empty),
   };
 }
 
@@ -300,6 +306,21 @@ export function handleFocusLost() {
   resetKeyStates();
 }
 
+export function restoreFocus() {
+  const element = document.activeElement;
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+
+  const dom = element.closest('.cm-editor');
+  const editor = dom instanceof HTMLElement ? EditorView.findFromDOM(dom) : null;
+  if (editor?.contentDOM === element) {
+    editor.focus();
+  } else {
+    element.focus({ preventScroll: true });
+  }
+}
+
 export function handleMouseExited(_clientX: number, _clientY: number) {
   setGutterHovered(false);
 }
@@ -360,6 +381,11 @@ function fixWebKitWheelIssues(scrollDOM: HTMLElement) {
   //
   // Better to fix CodeMirror at some point.
   scrollDOM.addEventListener('mousedown', event => {
+    // Descendant clicks belong to editor content, not the scrollbar
+    if (event.target !== scrollDOM) {
+      return;
+    }
+
     const target = event.target as HTMLElement;
     const clientX = event.clientX;
     const clientWidth = target.clientWidth;

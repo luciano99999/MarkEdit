@@ -5,18 +5,28 @@
 //
 
 import AppKit
+import AppKitExtensions
 import SwiftUI
 
 @MainActor
 final class TextCompletionPanel: NSPanel, TextCompletionPanelProtocol {
+  var tintColor: NSColor? {
+    get {
+      mainView?.layerBackgroundColor
+    }
+    set {
+      mainView?.layerBackgroundColor = newValue
+    }
+  }
+
   private var state = TextCompletionState()
   private var mainView: NSHostingView<TextCompletionView>?
 
   init(
-    modernStyle: Bool,
     effectViewType: NSView.Type,
+    tintColor: NSColor?,
     localizable: TextCompletionLocalizable,
-    commitCompletion: @escaping () -> Void
+    commitCompletion: @escaping @MainActor () -> Void
   ) {
     super.init(
       contentRect: .zero,
@@ -26,16 +36,16 @@ final class TextCompletionPanel: NSPanel, TextCompletionPanelProtocol {
     )
 
     let mainView = NSHostingView(rootView: TextCompletionView(
-      modernStyle: modernStyle,
       state: state,
       localizable: localizable,
       commitCompletion: commitCompletion
     ))
 
-    let contentView = ContentView(modernStyle: modernStyle, effectViewType: effectViewType, frame: .zero)
+    let contentView = ContentView(effectViewType: effectViewType, frame: .zero)
     contentView.addSubview(mainView)
 
     self.mainView = mainView
+    self.tintColor = tintColor
     self.contentView = contentView
     self.isOpaque = false
     self.hasShadow = true
@@ -95,11 +105,12 @@ final class TextCompletionPanel: NSPanel, TextCompletionPanelProtocol {
 // MARK: - Private
 
 private final class ContentView: NSView {
-  init(modernStyle: Bool, effectViewType: NSView.Type, frame: CGRect) {
+  init(effectViewType: NSView.Type, frame: CGRect) {
     super.init(frame: frame)
     wantsLayer = true
+    clipsToBounds = true
     layer?.cornerCurve = .continuous
-    layer?.cornerRadius = modernStyle ? 8 : 5
+    layer?.cornerRadius = 8
 
     let effectView = effectViewType.init()
     effectView.translatesAutoresizingMaskIntoConstraints = false

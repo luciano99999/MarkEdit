@@ -121,35 +121,33 @@ final class EditorViewController: NSViewController {
     return view
   }()
 
-  private(set) lazy var focusTrackingView = {
-    FocusTrackingView()
-  }()
-
   private(set) lazy var webView: WKWebView = {
+    let scripts = AppCustomization.userScripts().map { script in
+      (
+        context: EditorModuleSecretStorage.Context(id: script.id, path: script.path),
+        source: script.source
+      )
+    }
+
     let modules = NativeModules(modules: [
       EditorModuleCore(delegate: self),
       EditorModuleCompletion(delegate: self),
-      EditorModulePreview(delegate: self),
       EditorModuleTokenizer(),
       EditorModuleAPI(delegate: self),
       EditorModuleFoundationModels(delegate: self),
       EditorModuleTranslation(),
+      EditorModuleSecretStorage(contexts: scripts.map(\.context), delegate: self),
     ])
 
     let handler = EditorMessageHandler(modules: modules)
     let controller = WKUserContentController()
     controller.addScriptMessageHandler(handler, contentWorld: .page, name: "bridge")
 
-    let scripts = AppCustomization.isSafeMode ? [] : [
-      AppCustomization.editorScript.fileContents,
-    ] + AppCustomization.scriptsDirectory.contentsFrom(fileNames: ExtensionConfig.enabledFileNames)
-
-    scripts.forEach {
-      controller.addUserScript(WKUserScript(
-        source: $0,
-        injectionTime: .atDocumentEnd,
-        forMainFrameOnly: false
-      ))
+    EditorUserAsset.contextualScripts(for: scripts.map {
+      (path: $0.context.path, source: $0.source, capability: $0.context.capability)
+    })
+    .forEach {
+      controller.addUserScript($0)
     }
 
     let config: WKWebViewConfiguration = .newConfig(
@@ -171,7 +169,7 @@ final class EditorViewController: NSViewController {
     )
 
     // Respect user settings for Writing Tools behavior
-    if #available(macOS 15.1, *), let writingToolsBehavior = AppRuntimeConfig.writingToolsBehavior {
+    if let writingToolsBehavior = AppRuntimeConfig.writingToolsBehavior {
       config.writingToolsBehavior = writingToolsBehavior
     }
 
@@ -203,14 +201,12 @@ final class EditorViewController: NSViewController {
     }
 
     // [macOS 15] Detect Writing Tools visibility to work around issues
-    if #available(macOS 15.1, *) {
-      writingToolsObservation = webView.observe(\.isWritingToolsActive) { [weak self] _, _ in
-        guard let self else {
-          return
-        }
-
-        self.updateWritingTools(isActive: self.webView.isWritingToolsActive)
+    writingToolsObservation = webView.observe(\.isWritingToolsActive) { [weak self] _, _ in
+      guard let self else {
+        return
       }
+
+      self.updateWritingTools(isActive: self.webView.isWritingToolsActive)
     }
 
     return webView
@@ -218,8 +214,8 @@ final class EditorViewController: NSViewController {
 
   private(set) lazy var completionContext = {
     TextCompletionContext(
-      modernStyle: AppDesign.modernStyle,
       effectViewType: AppDesign.modernEffectView,
+      tintColor: transientTintColor(for: .current),
       localizable: TextCompletionLocalizable(selectedHint: Localized.General.selected)
     ) { [weak self] in
       guard let self else {
@@ -372,7 +368,7 @@ extension EditorViewController {
     bridge.core.insertText(text: text, from: 0, to: 0)
   }
 
-  func resetEditor() {
+  func resetEditor(resetSelection: Bool = false) {
     guard hasFinishedLoading, let document else {
       return
     }
@@ -388,7 +384,11 @@ extension EditorViewController {
     lastResetDocumentID = documentID
 
     let selectionRange: SelectionRange? = {
-      // CoreEditor preserves selection for same-document resets
+      if resetSelection {
+        return .init(anchor: 0, head: 0)
+      }
+
+      // Pass nil to preserve selection for same-document resets
       guard documentChanged else {
         return nil
       }

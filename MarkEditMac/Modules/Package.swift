@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,12 +6,20 @@ import PackageDescription
 let package = Package(
   name: "Modules",
   platforms: [
-    .macOS(.v15),
+    .macOS(.v26),
   ],
   products: [
     .library(
       name: "SharedUI",
       targets: ["SharedUI"]
+    ),
+    .library(
+      name: "QuickSearchUI",
+      targets: ["QuickSearchUI"]
+    ),
+    .library(
+      name: "QuickSearchCore",
+      targets: ["QuickSearchCore"]
     ),
     .library(
       name: "AppKitExtensions",
@@ -38,10 +46,6 @@ let package = Package(
       targets: ["FontPicker"]
     ),
     .library(
-      name: "Previewer",
-      targets: ["Previewer"]
-    ),
-    .library(
       name: "SettingsUI",
       targets: ["SettingsUI"]
     ),
@@ -65,12 +69,24 @@ let package = Package(
   ],
   targets: [
     .target(
+      name: "QuickSearchUI",
+      dependencies: ["QuickSearchCore", "AppKitExtensions"],
+      path: "Sources/QuickSearchUI",
+      plugins: [
+        .plugin(name: "SwiftLint", package: "MarkEditTools"),
+      ]
+    ),
+    .target(
+      name: "QuickSearchCore",
+      path: "Sources/QuickSearchCore",
+      plugins: [
+        .plugin(name: "SwiftLint", package: "MarkEditTools"),
+      ]
+    ),
+    .target(
       name: "SharedUI",
       dependencies: ["AppKitExtensions"],
       path: "Sources/SharedUI",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -78,9 +94,6 @@ let package = Package(
     .target(
       name: "AppKitExtensions",
       path: "Sources/AppKitExtensions",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -91,9 +104,6 @@ let package = Package(
       resources: [
         .process("Resources"),
       ],
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -102,9 +112,6 @@ let package = Package(
       name: "ExtensionCore",
       dependencies: ["AppKitExtensions", "MarkEditCore", "MarkEditKit"],
       path: "Sources/ExtensionCore",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -113,9 +120,6 @@ let package = Package(
       name: "FileDrop",
       dependencies: ["AppKitExtensions", "MarkEditKit", "TextBundle"],
       path: "Sources/FileDrop",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -124,9 +128,6 @@ let package = Package(
       name: "FileVersion",
       dependencies: ["SharedUI", "MarkEditKit", "DiffKit"],
       path: "Sources/FileVersion",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -135,23 +136,6 @@ let package = Package(
       name: "FontPicker",
       dependencies: ["AppKitExtensions"],
       path: "Sources/FontPicker",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
-      plugins: [
-        .plugin(name: "SwiftLint", package: "MarkEditTools"),
-      ]
-    ),
-    .target(
-      name: "Previewer",
-      dependencies: ["AppKitExtensions", "MarkEditCore", "MarkEditKit"],
-      path: "Sources/Previewer",
-      resources: [
-        .process("Resources"),
-      ],
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -160,9 +144,6 @@ let package = Package(
       name: "SettingsUI",
       dependencies: ["AppKitExtensions"],
       path: "Sources/SettingsUI",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -171,9 +152,6 @@ let package = Package(
       name: "Statistics",
       dependencies: ["AppKitExtensions", "MarkEditKit"],
       path: "Sources/Statistics",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -181,19 +159,14 @@ let package = Package(
     .target(
       name: "TextBundle",
       path: "Sources/TextBundle",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
     ),
     .target(
       name: "TextCompletion",
+      dependencies: ["AppKitExtensions"],
       path: "Sources/TextCompletion",
-      swiftSettings: [
-        .enableExperimentalFeature("StrictConcurrency")
-      ],
       plugins: [
         .plugin(name: "SwiftLint", package: "MarkEditTools"),
       ]
@@ -203,6 +176,8 @@ let package = Package(
       name: "ModulesTests",
       dependencies: [
         "SharedUI",
+        "QuickSearchUI",
+        "QuickSearchCore",
         "AppKitExtensions",
         "ExtensionCore",
         "FileDrop",

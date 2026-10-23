@@ -1,4 +1,4 @@
-import { CreateFileOptions, MoveFileOptions, SavePanelOptions } from 'markedit-api';
+import { CreateFileOptions, MoveFileOptions, OpenPanelOptions, PrintPanelOptions, SavePanelOptions } from 'markedit-api';
 import { NativeModule } from '../nativeModule';
 import { WebMenuItem } from '../../@types/WebMenuItem';
 import { WebPoint } from '../../@types/WebPoint';
@@ -9,13 +9,17 @@ import { WebPoint } from '../../@types/WebPoint';
  * @bridgeName NativeBridgeAPI
  */
 export interface NativeModuleAPI extends NativeModule {
+  openDocument(args: { path: string; target?: 'automatic' | 'window' | 'tab' }): Promise<boolean>;
   saveDocument(): Promise<boolean>;
   closeDocument(): Promise<boolean>;
+  recentDocumentPaths(): Promise<string[]>;
   addMainMenuItems({ items }: { items: WebMenuItem[] }): void;
-  showContextMenu(args: { items: WebMenuItem[]; location: WebPoint }): void;
+  showContextMenu(args: { items: WebMenuItem[]; location: WebPoint; highlightedIndex?: CodeGen_Int }): void;
   showAlert(args: { title?: string; message?: string; buttons?: string[] }): Promise<CodeGen_Int>;
   showTextBox(args: { title?: string; placeholder?: string; defaultValue?: string }): Promise<string | undefined>;
+  showOpenPanel({ options }: { options: OpenPanelOptions }): Promise<string[] | undefined>;
   showSavePanel({ options }: { options: SavePanelOptions }): Promise<boolean>;
+  showPrintPanel({ options }: { options: PrintPanelOptions }): Promise<boolean>;
   runService({ name, input }: { name: string; input?: string }): Promise<boolean>;
   openFile({ path }: { path: string }): Promise<boolean>;
   createFile({ options }: { options: CreateFileOptions }): Promise<boolean>;
@@ -29,9 +33,10 @@ export interface NativeModuleAPI extends NativeModule {
   getFileVersions(): Promise<string | undefined>;
   getFileVersionContent({ id }: { id: string }): Promise<string | undefined>;
   restoreFileVersion({ id }: { id: string }): Promise<boolean>;
-  deleteFileVersions({ ids }: { ids: string[] }): Promise<boolean>;
+  deleteLocalFileVersions({ ids }: { ids: string[] }): Promise<boolean>;
   getPasteboardItems(): Promise<string | undefined>;
   getPasteboardString(): Promise<string | undefined>;
   terminateApp(): void;
   relaunchApp(): void;
+  playSystemBeep(): void;
 }

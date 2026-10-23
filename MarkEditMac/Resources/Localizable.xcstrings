@@ -359,6 +359,29 @@
         }
       }
     },
+    "Add Bookmarks": {
+      "comment": "Menu and button title to bookmark files and folders",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加书签"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加入書籤"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi segnalibri"
+          }
+        }
+      }
+    },
     "All": {
       "comment": "Button title, perform actions to all items",
       "localizations": {
@@ -378,6 +401,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutto"
+          }
+        }
+      }
+    },
+    "Allow “%@” to Read a Saved Credential?": {
+      "comment": "Secret access confirmation title, with the extension identity",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许“%@”读取已保存的凭据吗？"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許“%@”讀取已儲存的憑證嗎？"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consentire a “%@” di leggere una credenziale salvata?"
+          }
+        }
+      }
+    },
+    "Allow MarkEdit to access the selected files and folders.": {
+      "comment": "Open panel message explaining bookmark access",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许 MarkEdit 访问所选文件和文件夹。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許 MarkEdit 存取所選的檔案與檔案夾。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti a MarkEdit di accedere ai file e alle cartelle selezionati."
+          }
+        }
+      }
+    },
+    "Allow This Read": {
+      "comment": "Button to approve one script read from Keychain",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许此次读取"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許此次讀取"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti questa lettura"
           }
         }
       }
@@ -588,6 +680,52 @@
         }
       }
     },
+    "bookmarked files": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书签文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籤檔案"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "file nei segnalibri"
+          }
+        }
+      }
+    },
+    "Bookmarks": {
+      "comment": "Quick Search filter for granted files and folders",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书签"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籤"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segnalibri"
+          }
+        }
+      }
+    },
     "Call Async JavaScript": {
       "localizations": {
         "zh-Hans": {
@@ -777,6 +915,29 @@
         }
       }
     },
+    "Close": {
+      "comment": "Button title to close a preview",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiudi"
+          }
+        }
+      }
+    },
     "Column": {
       "comment": "Column name for table creation",
       "localizations": {
@@ -796,6 +957,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Colonna"
+          }
+        }
+      }
+    },
+    "commands": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指令"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指令"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "comandi"
           }
         }
       }
@@ -870,6 +1054,29 @@
       }
     },
     "Content": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "內容"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenuto"
+          }
+        }
+      }
+    },
+    "Contents": {
+      "comment": "Quick Search filter for active-document text",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
@@ -1096,6 +1303,52 @@
         }
       }
     },
+    "Credential: %@\nRequested by: %@\n\nThe extension may retain and reuse the credential after this read.": {
+      "comment": "Secret access confirmation message, with the secret key followed by the requesting script's breadcrumb path",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "凭据：%@\n请求来源：%@\n\n扩展可能会在此次读取后保留并重复使用该凭据。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "憑證：%@\n請求來源：%@\n\n擴充功能可能會在此次讀取後保留並重複使用該憑證。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credenziale: %@\nRichiesta da: %@\n\nL’estensione potrebbe conservare e riutilizzare la credenziale dopo questa lettura."
+          }
+        }
+      }
+    },
+    "Current Document": {
+      "comment": "Quick Search filter section for the active document",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前文档"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當前文件"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documento corrente"
+          }
+        }
+      }
+    },
     "Dark": {
       "comment": "Always use dark mode for the app",
       "localizations": {
@@ -1138,6 +1391,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tema scuro:"
+          }
+        }
+      }
+    },
+    "Dark Themes": {
+      "comment": "Dark theme section title",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深色主题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深色主題"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temi scuri"
           }
         }
       }
@@ -1418,6 +1694,29 @@
         }
       }
     },
+    "Don’t Allow Read": {
+      "comment": "Button to deny a script read from Keychain",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不允许读取"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不允許讀取"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non consentire la lettura"
+          }
+        }
+      }
+    },
     "Done": {
       "comment": "Button title, confirm an action",
       "localizations": {
@@ -1529,6 +1828,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abilitata"
+          }
+        }
+      }
+    },
+    "Enabled Extensions": {
+      "comment": "Enabled theme extensions section title",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已启用的扩展"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已啟用的擴充功能"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estensioni abilitate"
           }
         }
       }
@@ -1875,6 +2197,52 @@
         }
       }
     },
+    "files, text, and commands": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件、文本和指令"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檔案、文字與指令"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "file, testo e comandi"
+          }
+        }
+      }
+    },
+    "Filter Results": {
+      "comment": "Quick Search filter menu accessibility label",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选结果"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "篩選結果"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtra risultati"
+          }
+        }
+      }
+    },
     "Find": {
       "comment": "Find mode in search menu",
       "localizations": {
@@ -1894,6 +2262,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca"
+          }
+        }
+      }
+    },
+    "Find files faster with Quick Search (⇧⌘O).": {
+      "comment": "Open panel hint, hidden after the first successful Quick Search action",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用快速搜索（⇧⌘O）更快地查找文件。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用快速搜尋（⇧⌘O）更快地尋找檔案。"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trova i file più velocemente con Ricerca rapida (⇧⌘O)."
           }
         }
       }
@@ -2135,29 +2526,6 @@
         }
       }
     },
-    "Get Custom Themes…": {
-      "comment": "Get custom themes from the GitHub",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "获取自定义主题…"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "獲取自訂主題…"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ottieni temi personalizzati…"
-          }
-        }
-      }
-    },
     "Get File Content": {
       "localizations": {
         "zh-Hans": {
@@ -2221,29 +2589,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vai alla riga"
-          }
-        }
-      }
-    },
-    "Grant Access": {
-      "comment": "Open panel prompt, used for granting access for the selected folder",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "授予权限"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "授予許可權"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Concedi accesso"
           }
         }
       }
@@ -2312,6 +2657,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Intestazioni"
+          }
+        }
+      }
+    },
+    "headings": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標題"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "intestazioni"
+          }
+        }
+      }
+    },
+    "Headings": {
+      "comment": "Quick Search filter for active-document headings",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標題"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intestazioni"
+          }
+        }
+      }
+    },
+    "Help…": {
+      "comment": "Quick Search filter menu item opening its documentation",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帮助…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "輔助說明…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aiuto…"
           }
         }
       }
@@ -2942,6 +3356,29 @@
         }
       }
     },
+    "Learn More…": {
+      "comment": "Button title, open related documentation",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "了解更多…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "瞭解更多…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulteriori informazioni…"
+          }
+        }
+      }
+    },
     "Light": {
       "comment": "Always use light mode for the app",
       "localizations": {
@@ -2984,6 +3421,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tema chiaro:"
+          }
+        }
+      }
+    },
+    "Light Themes": {
+      "comment": "Light theme section title",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浅色主题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "淺色主題"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temi chiari"
           }
         }
       }
@@ -3126,6 +3586,29 @@
         }
       }
     },
+    "Manage…": {
+      "comment": "Open installed theme extensions",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci…"
+          }
+        }
+      }
+    },
     "MarkEdit (Safe Mode)": {
       "comment": "App menu title when running without customizations",
       "localizations": {
@@ -3214,6 +3697,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "MarkEdit %@ è pronto per l'installazione!"
+          }
+        }
+      }
+    },
+    "Menu Actions": {
+      "comment": "Quick Search filter for menu actions",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "菜单操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選單操作"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azioni del menu"
           }
         }
       }
@@ -3894,6 +4400,52 @@
         }
       }
     },
+    "Quick Search": {
+      "comment": "Quick Search option in new window settings",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜索"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜尋"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca rapida"
+          }
+        }
+      }
+    },
+    "Quick Search for %@": {
+      "comment": "Quick Search placeholder, with a localized search target",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜索%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜尋%@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca rapida: %@"
+          }
+        }
+      }
+    },
     "Quit always keeps windows": {
       "comment": "Whether to keep windows when quit the app",
       "localizations": {
@@ -3963,6 +4515,29 @@
         }
       }
     },
+    "recent files": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用的文件"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用的檔案"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "file recenti"
+          }
+        }
+      }
+    },
     "Recent Searches": {
       "comment": "Menu item: recent searches",
       "localizations": {
@@ -4005,6 +4580,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usati di recente"
+          }
+        }
+      }
+    },
+    "Recents": {
+      "comment": "Quick Search filter for recent documents",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recenti"
           }
         }
       }
@@ -4423,6 +5021,29 @@
         }
       }
     },
+    "Reveal in Finder": {
+      "comment": "Menu item to reveal a bookmarked file or folder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在访达中找到"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中找到"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nel Finder"
+          }
+        }
+      }
+    },
     "Revert to This Version": {
       "comment": "Title for button to select a file version",
       "localizations": {
@@ -4442,6 +5063,52 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina questa versione"
+          }
+        }
+      }
+    },
+    "Revoke All": {
+      "comment": "Menu item to remove all bookmarks and release their access",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部撤销"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部撤銷"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoca tutto"
+          }
+        }
+      }
+    },
+    "Revoke Bookmark": {
+      "comment": "Menu item to remove a bookmark and release its access",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销书签"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤銷書籤"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoca segnalibro"
           }
         }
       }
@@ -4487,6 +5154,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Azioni di ricerca"
+          }
+        }
+      }
+    },
+    "Search files, the current document, and menu actions": {
+      "comment": "Accessibility help for Quick Search",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索文件、当前文档和菜单操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋檔案、當前文件與選單操作"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca tra i file, il documento corrente e le azioni del menu"
           }
         }
       }
@@ -5135,6 +5825,29 @@
         }
       }
     },
+    "text": {
+      "comment": "Search target in the Quick Search placeholder",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "testo"
+          }
+        }
+      }
+    },
     "Text Encoding:": {
       "comment": "Label for save panel accessory view",
       "localizations": {
@@ -5476,6 +6189,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disattiva per mantenere l'estensione installata ma non attiva"
+          }
+        }
+      }
+    },
+    "Unavailable Bookmark %d": {
+      "comment": "Title for an unresolvable bookmark, numbered by its position",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用的书签 %d"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法使用的書籤 %d"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segnalibro %d non disponibile"
           }
         }
       }

@@ -15,12 +15,12 @@ import Observation
 /// A row to scroll to once it's listed, either the first of a category or an exact item.
 enum ExtensionsScrollTarget: Equatable {
   case category(ExtensionEntry.Category)
-  case item(id: String)
+  case item(id: String, highlight: Bool = true)
 
   func matches(_ item: ExtensionsModel.Item) -> Bool {
     switch self {
     case .category(let category): return item.category == category
-    case .item(let id): return item.id == id
+    case .item(let id, _): return item.id == id
     }
   }
 }
@@ -28,7 +28,7 @@ enum ExtensionsScrollTarget: Equatable {
 @Observable
 @MainActor
 final class ExtensionsListInteraction {
-  var scrollGeneration = 0
+  var updatePopoverItemID: String?
   var inlineUpdateItemIDs: Set<String> = []
 }
 
@@ -43,6 +43,7 @@ final class ExtensionsViewController: NSViewController {
   let tableView = NSTableView()
   let listInteraction = ExtensionsListInteraction()
   let rowMeasurer = TableCellWrapper.Measurer()
+  let rowMargin: Double = 20
 
   var displayedItems: [ExtensionsModel.Item] = [] {
     didSet {
@@ -57,6 +58,7 @@ final class ExtensionsViewController: NSViewController {
 
   private var displayedMode: ExtensionsModel.Mode
   private var isRunningProgressOverlay = false
+  private var isPullRefreshing = false
   private var displayedRelaunch = false
   private var isAnimatingRelaunch = false
   private var pendingScrollTarget: ExtensionsScrollTarget?
@@ -222,7 +224,7 @@ extension ExtensionsViewController: NSTableViewDelegate {
     }()
 
     // Opaque fill so animating rows don't show each other's text through the crossfade
-    rowView.backgroundColor = .finderContentBackground
+    rowView.backgroundColor = .windowBackgroundColor
     return rowView
   }
 }
@@ -292,10 +294,41 @@ extension ExtensionsViewController: ExtensionsPresenting {
 // MARK: - Refresh
 
 extension ExtensionsViewController {
+  func isBusyRefreshing() -> Bool {
+    isRunningProgressOverlay || isPullRefreshing
+  }
+
   /// Explicit "Refresh": animate every row out, reconcile and refetch, then animate the fresh rows in.
   func refreshAnimated() {
     runWithProgressOverlay(message: Localized.Extension.refreshing) { [weak self] in
       await self?.model.load(forceRefresh: true)
+    }
+  }
+
+  /// Pull refresh keeps the list visible and uses only the native refresh indicator.
+  @available(macOS 27.0, *)
+  @objc private func pullToRefresh(_ sender: NSRefreshController) {
+    guard !isPullRefreshing else {
+      return
+    }
+
+    guard !isRunningProgressOverlay, !model.isBusy, model.phase != .loading else {
+      sender.endRefreshing()
+      return
+    }
+
+    isPullRefreshing = true
+    updateStateController()
+
+    Task { @MainActor in
+      defer {
+        isPullRefreshing = false
+        sender.endRefreshing()
+        updateStateController()
+      }
+
+      await model.load(forceRefresh: true)
+      applyModelChanges()
     }
   }
 
@@ -340,7 +373,7 @@ extension ExtensionsViewController {
     scrollView.contentView.setBoundsOrigin(boundsOrigin)
     scrollView.reflectScrolledClipView(scrollView.contentView)
 
-    if case .item(let id) = target {
+    if case .item(let id, highlight: true) = target {
       flashHighlight(itemID: id)
     }
   }
@@ -352,7 +385,7 @@ private extension ExtensionsViewController {
   enum Constants {
     static let rowIdentifier = NSUserInterfaceItemIdentifier("ExtensionsRow")
     static let cellIdentifier = NSUserInterfaceItemIdentifier("ExtensionsRowCell")
-    static let overScrollInset: Double = if #available(macOS 26.0, *) { 20 } else { 0 }
+    static let overScrollInset: Double = 20
     static let overlayOpticalOffset: Double = 20
     static let minimumOverlayDuration: TimeInterval = 1.2
     static let highlightDuration: Duration = .seconds(1.5)
@@ -389,8 +422,15 @@ private extension ExtensionsViewController {
     scrollView.automaticallyAdjustsContentInsets = false
     scrollView.hasVerticalScroller = true
     scrollView.drawsBackground = true
-    scrollView.backgroundColor = .finderContentBackground
+    scrollView.backgroundColor = .windowBackgroundColor
     view.addSubview(scrollView)
+
+    if #available(macOS 27.0, *) {
+      let refreshController = NSRefreshController()
+      refreshController.target = self
+      refreshController.action = #selector(pullToRefresh(_:))
+      scrollView.refreshController = refreshController
+    }
 
     let contentView = scrollView.contentView
     contentView.postsBoundsChangedNotifications = true
@@ -403,13 +443,19 @@ private extension ExtensionsViewController {
   }
 
   @objc func scrollViewBoundsDidChange(_ notification: Notification) {
+    if listInteraction.updatePopoverItemID != nil {
+      listInteraction.updatePopoverItemID = nil
+    }
+
+    guard !listInteraction.inlineUpdateItemIDs.isEmpty else {
+      return
+    }
+
     let inlineRows = IndexSet(listInteraction.inlineUpdateItemIDs.compactMap { id in
       displayedItems.firstIndex { $0.id == id }
     })
 
     listInteraction.inlineUpdateItemIDs.removeAll()
-    listInteraction.scrollGeneration &+= 1
-
     if !inlineRows.isEmpty {
       reloadRows(inlineRows)
     }
@@ -555,13 +601,13 @@ private extension ExtensionsViewController {
   }
 
   func updateStateController() {
-    // The state view (loading spinner / empty message) shows only when there are no rows
-    stateController.view.isHidden = !displayedItems.isEmpty
+    // Pull refresh owns loading feedback even when the list is empty
+    stateController.view.isHidden = isPullRefreshing || !displayedItems.isEmpty
   }
 
   /// Empties the list to reveal the whole-page spinner, runs `action`, then animates the fresh rows in.
   func runWithProgressOverlay(message: String, action: @escaping () async -> Void) {
-    guard !isRunningProgressOverlay else {
+    guard !isBusyRefreshing() else {
       return
     }
 

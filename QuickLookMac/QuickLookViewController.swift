@@ -12,15 +12,16 @@ import MarkEditCore
 
 final class QuickLookViewController: NSViewController {
   var guidanceView: NSView?
-  var mouseDownMonitor: Any?
-  var mouseDragMonitor: Any?
-  var mouseUpMonitor: Any?
-  var isDraggingScroller = false
 
   weak var defaultOpenTarget: AnyObject?
   var defaultOpenAction: Selector?
 
+  lazy var openRecognizer = QuickLookOpenGestureRecognizer(target: self, action: #selector(openPreview(_:)))
+  lazy var scrollbarClickRecognizer = NSClickGestureRecognizer(target: self, action: #selector(clickScrollbar(_:)))
+  lazy var scrollbarDragRecognizer = NSPanGestureRecognizer(target: self, action: #selector(dragScrollbar(_:)))
+
   private var previewDirectoryURL: URL?
+  private var previewRequestID = UUID()
   private var appearanceObservation: NSKeyValueObservation?
   private weak var observedResizeWindow: NSWindow?
 
@@ -59,23 +60,8 @@ final class QuickLookViewController: NSViewController {
     NSNib.Name("Main")
   }
 
-  deinit {
+  isolated deinit {
     NotificationCenter.default.removeObserver(self)
-
-    if let mouseDownMonitor {
-      NSEvent.removeMonitor(mouseDownMonitor)
-      self.mouseDownMonitor = nil
-    }
-
-    if let mouseDragMonitor {
-      NSEvent.removeMonitor(mouseDragMonitor)
-      self.mouseDragMonitor = nil
-    }
-
-    if let mouseUpMonitor {
-      NSEvent.removeMonitor(mouseUpMonitor)
-      self.mouseUpMonitor = nil
-    }
   }
 
   override func viewDidLoad() {
@@ -91,7 +77,7 @@ final class QuickLookViewController: NSViewController {
     view.layer?.masksToBounds = true
     view.layer?.cornerRadius = 6
 
-    addEventMonitorsForDragging()
+    configureGestures()
     updateAppearance()
 
     appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
@@ -116,7 +102,7 @@ final class QuickLookViewController: NSViewController {
     guidanceView?.frame = view.bounds
 
     if view.window != nil {
-      disableDefaultOpen()
+      configureDefaultOpen()
     }
   }
 }
@@ -125,15 +111,23 @@ final class QuickLookViewController: NSViewController {
 
 extension QuickLookViewController: QLPreviewingController {
   func preparePreviewOfFile(at url: URL) async throws {
+    try Task.checkCancellation()
+    let requestID = UUID()
+    previewRequestID = requestID
+
     guard EditorIndexHtml.sharedFileExists else {
       return showSetUpGuidance()
     }
 
-    let fileURL = textFileURL(of: url)
-    previewDirectoryURL = fileURL.deletingLastPathComponent()
+    let contents = try await Self.readPreview(at: url)
+    try Task.checkCancellation()
+    guard previewRequestID == requestID else {
+      return
+    }
 
+    previewDirectoryURL = contents.url.deletingLastPathComponent()
     let config = EditorConfig.quicklookConfig(
-      fileData: try Data(contentsOf: fileURL)
+      fileData: contents.data
     )
 
     let index = [EditorIndexHtml.fromSharedContainer(config: config)]

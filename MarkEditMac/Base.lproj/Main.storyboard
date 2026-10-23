@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.Storyboard.XIB" version="3.0" toolsVersion="24765" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
+<document type="com.apple.InterfaceBuilder3.Cocoa.Storyboard.XIB" version="3.0" toolsVersion="25098" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES">
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24765"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="25098"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
@@ -34,7 +34,7 @@
                                             </connections>
                                         </menuItem>
                                         <menuItem title="(settings.json)" secondaryImage="gearshape.2" catalog="system" hidden="YES" keyEquivalent="," allowsKeyEquivalentWhenHidden="YES" id="6iB-Ox-Xb3">
-                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                             <connections>
                                                 <action selector="openSettingsJSON:" target="Voe-Tx-rLC" id="IEe-p5-MWL"/>
                                             </connections>
@@ -61,10 +61,10 @@
                                                             <action selector="openDocumentsFolder:" target="Voe-Tx-rLC" id="cD9-hQ-p0k"/>
                                                         </connections>
                                                     </menuItem>
-                                                    <menuItem title="Grant Folder Access" id="hw9-Pl-u8s">
+                                                    <menuItem title="Add Bookmarks…" id="hw9-Pl-u8s">
                                                         <modifierMask key="keyEquivalentModifierMask"/>
                                                         <connections>
-                                                            <action selector="grantFolderAccess:" target="Voe-Tx-rLC" id="NVa-7Q-Zg0"/>
+                                                            <action selector="addBookmarks:" target="Voe-Tx-rLC" id="NVa-7Q-Zg0"/>
                                                         </connections>
                                                     </menuItem>
                                                     <menuItem title="Launch Safe Mode" id="zSM-YV-rGb">
@@ -133,6 +133,12 @@
                                         <menuItem title="Open…" keyEquivalent="o" id="IAo-SY-fd9">
                                             <connections>
                                                 <action selector="openDocument:" target="Ady-hI-5gd" id="bVn-NM-KNZ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Quick Search…" keyEquivalent="O" id="OQ1-op-enQ">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="quickSearch:" target="Voe-Tx-rLC" id="OQ2-op-enQ"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem title="Open Recent" id="tXI-mr-wws">
@@ -309,11 +315,13 @@
                                             </menu>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="McZ-Mt-f0I"/>
-                                        <menuItem title="Grant Folder Access" id="j7w-ok-RLg">
+                                        <menuItem title="Bookmarks" secondaryImage="bookmark" catalog="system" id="j7w-ok-RLg">
                                             <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="grantFolderAccess:" target="Voe-Tx-rLC" id="RGE-SD-4YU"/>
-                                            </connections>
+                                            <menu key="submenu" title="Bookmarks" id="bkm-Mn-001">
+                                                <connections>
+                                                    <outlet property="delegate" destination="Voe-Tx-rLC" id="bkm-Dl-001"/>
+                                                </connections>
+                                            </menu>
                                         </menuItem>
                                         <menuItem title="Purge History Versions" id="yfL-ea-k7X">
                                             <modifierMask key="keyEquivalentModifierMask"/>
@@ -425,7 +433,7 @@ Gw
                                         </menuItem>
                                         <menuItem title="Select All" secondaryImage="character.textbox" catalog="system" keyEquivalent="a" id="Ruw-6m-B2m">
                                             <connections>
-                                                <action selector="selectWholeDocument:" target="Ady-hI-5gd" id="VLu-xb-TLI"/>
+                                                <action selector="selectAll:" target="Ady-hI-5gd" id="VLu-xb-TLI"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="Ts4-WW-MvM"/>
@@ -438,7 +446,8 @@ Gw
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <menu key="submenu" title="Table of Contents" id="BxI-nv-Xa5">
                                                 <items>
-                                                    <menuItem title="Open Menu" keyEquivalent="O" id="IPm-0a-pwK">
+                                                    <menuItem title="Open Menu" keyEquivalent="o" id="IPm-0a-pwK">
+                                                        <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                                         <connections>
                                                             <action selector="openTableOfContents:" target="Ady-hI-5gd" id="GAy-8C-JmJ"/>
                                                         </connections>
@@ -1068,6 +1077,7 @@ Gw
                 </application>
                 <customObject id="Voe-Tx-rLC" customClass="AppDelegate" customModule="MarkEdit" customModuleProvider="target">
                     <connections>
+                        <outlet property="bookmarksMenu" destination="bkm-Mn-001" id="bkm-Ot-001"/>
                         <outlet property="copyPandocCommandMenu" destination="QZC-LS-WMo" id="GLu-1M-G8M"/>
                         <outlet property="editCommandsMenu" destination="9un-8n-UQZ" id="TkW-D6-2rF"/>
                         <outlet property="editFindMenu" destination="1b7-l0-nxx" id="qe6-lW-EOG"/>
@@ -1103,6 +1113,7 @@ Gw
                         <outlet property="mainUpdateItem" destination="ETL-k6-svK" id="rQZ-1x-GRC"/>
                         <outlet property="mainWindowMenu" destination="Td7-aD-5lo" id="9j1-c6-lEO"/>
                         <outlet property="openFileInMenu" destination="Tuy-2U-frg" id="Udj-25-y2I"/>
+                        <outlet property="openRecentMenu" destination="oas-Oc-fiZ" id="oqr-Ot-001"/>
                         <outlet property="postponeUpdateItem" destination="r3b-uF-Yy9" id="8kS-ni-Kae"/>
                         <outlet property="presentUpdateItem" destination="Jc8-2v-hRb" id="Ywd-5S-qLn"/>
                         <outlet property="reopenFileMenu" destination="sPG-vJ-QST" id="6e4-Zg-kFp"/>
@@ -1157,11 +1168,12 @@ Gw
         <image name="bell" catalog="system" width="15" height="16"/>
         <image name="bell.slash" catalog="system" width="15" height="17"/>
         <image name="bold" catalog="system" width="11" height="12"/>
+        <image name="bookmark" catalog="system" width="14" height="16"/>
         <image name="character.textbox" catalog="system" width="19" height="14"/>
         <image name="clock.arrow.trianglehead.counterclockwise.rotate.90" catalog="system" width="16" height="15"/>
         <image name="curlybraces" catalog="system" width="15" height="16"/>
         <image name="equal" catalog="system" width="12" height="8"/>
-        <image name="gear" catalog="system" width="17" height="16"/>
+        <image name="gear" catalog="system" width="17" height="17"/>
         <image name="gearshape.2" catalog="system" width="20" height="16"/>
         <image name="info.circle" catalog="system" width="15" height="15"/>
         <image name="italic" catalog="system" width="10" height="12"/>

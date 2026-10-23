@@ -3,16 +3,19 @@ import { HighlightStyle, TagStyle, syntaxHighlighting } from '@codemirror/langua
 import { Tag, tags as defaultTags } from '@lezer/highlight';
 import { StyleSpec } from 'style-mod';
 import { ColorScheme, EditorColors } from './types';
-import { shadowableTextColor } from './helper';
+import { adjustAlpha, shadowableTextColor } from './helper';
 import { isChrome } from '../common/utils';
 
 // Extend tags by adding Markdown-specific ones
+const listMark = Tag.define();
+const tableMark = Tag.define(listMark);
+
 const tags = {
   ...defaultTags,
   inlineCode: Tag.define(),
   codeInfo: Tag.define(),
   codeMark: Tag.define(),
-  listMark: Tag.define(),
+  listMark, tableMark,
   quoteMark: Tag.define(),
   linkMark: Tag.define(),
   linkDefinition: Tag.define(),
@@ -54,7 +57,7 @@ const sharedStyles: { [selector: string]: StyleSpec } = {
   },
   '.cm-foldGutter, .cm-foldPlaceholder': {
     // Don't use ui-monospace because ▶︎ and ••• look very big
-    fontFamily: 'monospace !important',
+    fontFamily: 'Menlo, monospace !important',
     // Make ▼ and ▶︎ more visually centered
     transform: 'translateY(-0.1em)',
   },
@@ -80,11 +83,12 @@ const sharedStyles: { [selector: string]: StyleSpec } = {
   '.cm-tooltip-autocomplete': {
     overflow: 'auto',
     marginTop: '5px',
-    borderRadius: '5px',
+    borderRadius: '8px',
     maxWidth: '1280px',
   },
   '.cm-tooltip-autocomplete ul': {
     maxHeight: 'var(--tooltip-completion-max-height) !important',
+    padding: '4px !important',
   },
   '.cm-tooltip-autocomplete ul li': {
     padding: '4px !important',
@@ -116,6 +120,9 @@ const sharedStyles: { [selector: string]: StyleSpec } = {
   '.cm-md-inlineCodeEnd': {
     borderTopRightRadius: '3px',
     borderBottomRightRadius: '3px',
+  },
+  '.cm-md-tableMark': {
+    fontWeight: '500',
   },
 };
 
@@ -157,7 +164,7 @@ function buildTheme(colors: EditorColors, scheme?: ColorScheme) {
     },
     // Handle of code folding
     '.cm-foldGutter.cm-gutterHover, .cm-foldPlaceholder': {
-      color: `${colors.text}66`,
+      color: adjustAlpha(colors.text, 0.4),
     },
     '.cm-foldPlaceholder': {
       backgroundColor: colors.lighterBackground,
@@ -179,15 +186,22 @@ function buildTheme(colors: EditorColors, scheme?: ColorScheme) {
     },
     // Autocomplete
     '.cm-tooltip-autocomplete': {
-      border: `1px solid ${colors.text}4d`,
-      backgroundColor: `${colors.background}99`,
-      backdropFilter: 'blur(10px)',
-      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08)',
+      border: `1px solid ${adjustAlpha(colors.text, 0.2)}`,
+      background: scheme === 'dark'
+        ? `linear-gradient(#ffffff08, #ffffff08), ${adjustAlpha(colors.background, 0.85)}`
+        : `linear-gradient(#00000008, #00000008), ${adjustAlpha(colors.background, 0.85)}`,
+      backdropFilter: 'blur(16px) saturate(70%)',
+      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.16)',
     },
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
-      backgroundColor: `${colors.text}12`,
+      color: colors.text,
+      background: scheme === 'dark'
+        ? `linear-gradient(#ffffff24, #ffffff24), ${colors.background}`
+        : colors.background,
+      borderRadius: '6px',
+      boxShadow: '0 1px 4px rgba(0, 0, 0, 0.12)',
     },
-    '.cm-tooltip-autocomplete ul li, .cm-tooltip-autocomplete ul li[aria-selected]': {
+    '.cm-tooltip-autocomplete ul li': {
       color: colors.text,
     },
     '.cm-completionMatchedText': {
@@ -208,10 +222,10 @@ function buildTheme(colors: EditorColors, scheme?: ColorScheme) {
       color: colors.visibleSpace,
     },
     '.cm-selectedVisible .cm-visibleTab': {
-      backgroundColor: `${colors.text}99`,
+      backgroundColor: adjustAlpha(colors.text, 0.6),
     },
     '.cm-selectedVisible .cm-visibleSpace::before, .cm-selectedVisible .cm-visibleLineBreak::before': {
-      color: `${colors.text}99`,
+      color: adjustAlpha(colors.text, 0.6),
     },
     '.cm-md-activeIndicator': {
       background: colors.activeLine,

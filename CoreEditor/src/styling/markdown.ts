@@ -1,11 +1,12 @@
 import { syntaxHighlighting } from '@codemirror/language';
 import { classHighlighter, tagHighlighter, styleTags } from '@lezer/highlight';
 import { MarkdownConfig } from '@lezer/markdown';
-import { markdownMathExtension as markdownMathConfig } from '../@vendor/joplin/markdownMathParser';
+import { markdownMathExtension as markdownMathConfig } from '../modules/math';
 import { tags } from './builder';
 import { linkDefinitionConfig } from './nodes/def';
 import { listIndentStyle } from './nodes/indent';
-import { inlineCodeStyle, codeBlockStyle, previewMermaid, previewMath } from './nodes/code';
+import { inlineCodeStyle, codeBlockStyle, previewMermaid } from './nodes/code';
+import { previewMath } from './nodes/math';
 import { previewTable, tableStyle } from './nodes/table';
 import { frontMatterStyle } from './nodes/frontMatter';
 import { taskMarkerStyle } from './nodes/task';
@@ -29,6 +30,7 @@ export const classHighlighters = [
     { tag: tags.codeMark, class: 'cm-md-codeMark' },
     { tag: tags.linkMark, class: 'cm-md-linkMark' },
     { tag: tags.listMark, class: 'cm-md-listMark' },
+    { tag: tags.tableMark, class: 'cm-md-tableMark' },
     { tag: tags.quote, class: 'cm-md-quote' },
     { tag: tags.quoteMark, class: 'cm-md-quoteMark' },
     { tag: tags.contentSeparator, class: 'cm-md-horizontalRule' },
@@ -44,6 +46,7 @@ export const markdownExtensions: MarkdownConfig[] = [
         CodeInfo: tags.codeInfo,
         CodeMark: tags.codeMark,
         ListMark: tags.listMark,
+        TableDelimiter: tags.tableMark,
         QuoteMark: tags.quoteMark,
         LinkMark: tags.linkMark,
         LinkDefinition: tags.linkDefinition,

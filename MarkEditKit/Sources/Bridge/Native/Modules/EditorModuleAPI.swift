@@ -4,19 +4,24 @@
 //  Created by cyan on 10/4/24.
 //
 
+import Darwin
 import Foundation
 import UniformTypeIdentifiers
 
 #if os(macOS)
   import AppKit
+  import PDFKit
 #endif
+
+public typealias OpenDocumentTarget = NativeModuleAPIOpenDocumentTarget
 
 @MainActor
 public protocol EditorModuleAPIDelegate: AnyObject {
+  func editorAPI(_ sender: EditorModuleAPI, openDocument fileURL: URL, target: OpenDocumentTarget) async -> Bool
   func editorAPISaveDocument(_ sender: EditorModuleAPI) async -> Bool
   func editorAPICloseDocument(_ sender: EditorModuleAPI) -> Bool
   func editorAPI(_ sender: EditorModuleAPI, addMainMenuItems items: [(String, WebMenuItem)])
-  func editorAPI(_ sender: EditorModuleAPI, showContextMenu items: [WebMenuItem], location: WebPoint)
+  func editorAPI(_ sender: EditorModuleAPI, showContextMenu items: [WebMenuItem], location: WebPoint, highlightedIndex: Int?)
   func editorAPI(
     _ sender: EditorModuleAPI,
     alertWith title: String?,
@@ -38,13 +43,18 @@ public protocol EditorModuleAPIDelegate: AnyObject {
   func editorAPIRelaunchApp(_ sender: EditorModuleAPI)
 }
 
+@MainActor
 public final class EditorModuleAPI: NativeModuleAPI {
   private weak var delegate: EditorModuleAPIDelegate?
   private var fileVersionURL: URL?
-  private var fileVersionMap = [String: NSFileVersion]()
+  private var fileVersionMap = [String: (version: NSFileVersion, isLocal: Bool)]()
 
   public init(delegate: EditorModuleAPIDelegate) {
     self.delegate = delegate
+  }
+
+  public func openDocument(path: String, target: OpenDocumentTarget?) async -> Bool {
+    await delegate?.editorAPI(self, openDocument: URL(filePath: path), target: target ?? .automatic) == true
   }
 
   public func saveDocument() async -> Bool {
@@ -55,14 +65,23 @@ public final class EditorModuleAPI: NativeModuleAPI {
     delegate?.editorAPICloseDocument(self) == true
   }
 
+  public func recentDocumentPaths() async -> [String] {
+  #if os(macOS)
+    NSDocumentController.shared.recentDocumentURLs.map(\.path)
+  #else
+    Logger.log(.error, "Recent documents are only supported on macOS")
+    return []
+  #endif
+  }
+
   public func addMainMenuItems(items: [WebMenuItem]) {
     delegate?.editorAPI(self, addMainMenuItems: items.map { item in
       (item.uniqueID.sha256Hash, item)
     })
   }
 
-  public func showContextMenu(items: [WebMenuItem], location: WebPoint) {
-    delegate?.editorAPI(self, showContextMenu: items, location: location)
+  public func showContextMenu(items: [WebMenuItem], location: WebPoint, highlightedIndex: Int?) {
+    delegate?.editorAPI(self, showContextMenu: items, location: location, highlightedIndex: highlightedIndex)
   }
 
   public func showAlert(title: String?, message: String?, buttons: [String]?) async -> Int {
@@ -75,6 +94,39 @@ public final class EditorModuleAPI: NativeModuleAPI {
 
   public func showSavePanel(options: SavePanelOptions) async -> Bool {
     await delegate?.editorAPI(self, showSavePanel: options.decodedData, fileName: options.fileName) == true
+  }
+
+  public func showPrintPanel(options: PrintPanelOptions) async -> Bool {
+  #if os(macOS)
+    guard let data = Data(base64Encoded: options.data) else {
+      Logger.log(.error, "Failed to decode PDF data for printing")
+      return false
+    }
+
+    guard let document = PDFDocument(data: data) else {
+      Logger.log(.error, "Failed to open PDF for printing")
+      return false
+    }
+
+    guard let operation = document.printOperation(
+      for: .shared,
+      scalingMode: .pageScaleDownToFit,
+      autoRotate: true
+    ) else {
+      Logger.log(.error, "Failed to create print operation for PDF")
+      return false
+    }
+
+    if let title = options.title {
+      operation.jobTitle = title
+    }
+
+    operation.showsPrintPanel = true
+    return operation.run()
+  #else
+    Logger.log(.error, "PDF printing is only supported on macOS")
+    return false
+  #endif
   }
 
   public func runService(name: String, input: String?) async -> Bool {
@@ -139,17 +191,27 @@ public final class EditorModuleAPI: NativeModuleAPI {
     }
 
     do {
-      if FileManager.default.fileExists(at: destinationURL).fileExists {
+      let fileManager = FileManager.default
+      if fileManager.fileExists(at: destinationURL).fileExists {
+        if try fileManager.isSameFile(at: sourceURL, and: destinationURL) {
+          return true
+        }
+
         guard options.overwrites == true else {
+          Logger.log(.error, "moveFile destination already exists")
           return false
         }
 
-        try FileManager.default.removeItem(at: destinationURL)
+        guard Darwin.rename(sourceURL.path, destinationURL.path) == 0 else {
+          throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+      } else {
+        try fileManager.moveItem(at: sourceURL, to: destinationURL)
       }
 
-      try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
       return true
     } catch {
+      Logger.log(.error, "moveFile failed: \(error.localizedDescription)")
       return false
     }
   }
@@ -255,7 +317,7 @@ public final class EditorModuleAPI: NativeModuleAPI {
     return try? JSONSerialization.data(withJSONObject: json).toString()
   #else
     Logger.assertFail("Missing implementation, consider using web api directly")
-    return []
+    return nil
   #endif
   }
 
@@ -274,6 +336,57 @@ public final class EditorModuleAPI: NativeModuleAPI {
 
   public func relaunchApp() {
     delegate?.editorAPIRelaunchApp(self)
+  }
+
+  public func playSystemBeep() {
+  #if os(macOS)
+    NSSound.beep()
+  #else
+    Logger.assertFail("Missing implementation, playing the system beep requires AppKit")
+  #endif
+  }
+}
+
+// MARK: - Open Panel
+
+public extension EditorModuleAPI {
+  func showOpenPanel(options: OpenPanelOptions) async -> [String]? {
+  #if os(macOS)
+    let openPanel = NSOpenPanel()
+    if let title = options.title {
+      openPanel.title = title
+    }
+
+    if let message = options.message {
+      openPanel.message = message
+    }
+
+    if let prompt = options.prompt {
+      openPanel.prompt = prompt
+    }
+
+    let selectionType = options.selectionType ?? .files
+    openPanel.canChooseFiles = selectionType != .directories
+    openPanel.canChooseDirectories = selectionType != .files
+    openPanel.allowsMultipleSelection = options.allowsMultipleSelection ?? false
+    openPanel.showsHiddenFiles = true
+    openPanel.canCreateDirectories = true
+    openPanel.titlebarAppearsTransparent = true
+
+    guard await openPanel.begin() == .OK else {
+      return nil
+    }
+
+    guard !openPanel.urls.isEmpty else {
+      Logger.log(.error, "No files or folders were selected")
+      return nil
+    }
+
+    return openPanel.urls.map(\.path)
+  #else
+    Logger.log(.error, "Open panels are only supported on macOS")
+    return nil
+  #endif
   }
 }
 
@@ -297,13 +410,14 @@ public extension EditorModuleAPI {
     }
 
     var idsByVersion = [FileVersionKey: String]()
-    for (id, version) in fileVersionMap {
+    for (id, (version, _)) in fileVersionMap {
       if let key = FileVersionKey(version) {
         idsByVersion[key] = id
       }
     }
 
     let localVersions = NSFileVersion.otherVersionsOfItem(at: fileURL) ?? []
+    let localKeys = Set(localVersions.compactMap(FileVersionKey.init))
     var seenVersions = Set<FileVersionKey>()
 
     let versions = (localVersions + nonlocalVersions).filter {
@@ -315,17 +429,19 @@ public extension EditorModuleAPI {
     }
     .newestToOldest(throttle: false)
 
-    var newVersionMap = [String: NSFileVersion]()
+    var newVersionMap = [String: (version: NSFileVersion, isLocal: Bool)]()
     let result: [[String: Any]] = versions.compactMap { version in
       guard let key = FileVersionKey(version), let modificationDate = version.modificationDate else {
         return nil
       }
 
       let id = idsByVersion[key] ?? UUID().uuidString
-      newVersionMap[id] = version
+      let isLocal = localKeys.contains(key)
+      newVersionMap[id] = (version, isLocal)
       return [
         "id": id,
         "modificationDate": modificationDate.timeIntervalSince1970,
+        "isLocal": isLocal,
       ]
     }
 
@@ -369,7 +485,7 @@ public extension EditorModuleAPI {
     return await delegate?.editorAPI(self, restoreFileVersionContent: content) == true
   }
 
-  func deleteFileVersions(ids: [String]) async -> Bool {
+  func deleteLocalFileVersions(ids: [String]) async -> Bool {
     let uniqueIDs = Set(ids)
     guard !uniqueIDs.isEmpty, uniqueIDs.allSatisfy({ currentFileVersion(id: $0) != nil }) else {
       return false
@@ -380,7 +496,7 @@ public extension EditorModuleAPI {
     }
 
     let versions = uniqueIDs.compactMap { id -> (String, NSFileVersion, FileVersionKey)? in
-      guard let version = fileVersionMap[id], let key = FileVersionKey(version) else {
+      guard let (version, isLocal) = fileVersionMap[id], isLocal, let key = FileVersionKey(version) else {
         return nil
       }
 
@@ -397,7 +513,7 @@ public extension EditorModuleAPI {
       }
 
       do {
-        try await version.removeFromDisk()
+        try await version.removeFromDisk(for: fileVersionURL)
       } catch {
         Logger.log(.error, error.localizedDescription)
         return false
@@ -407,7 +523,7 @@ public extension EditorModuleAPI {
         return false
       }
 
-      if let currentVersion = fileVersionMap[id], FileVersionKey(currentVersion) != key {
+      if let currentVersion = fileVersionMap[id]?.version, FileVersionKey(currentVersion) != key {
         return false
       }
 
@@ -431,7 +547,7 @@ private extension EditorModuleAPI {
       return nil
     }
 
-    return fileVersionMap[id]
+    return fileVersionMap[id]?.version
   }
 
   func isCurrentFileVersionURL(_ expectedURL: URL? = nil) -> Bool {
@@ -503,6 +619,19 @@ private extension WebDataTransfer {
 }
 
 private extension FileManager {
+  func isSameFile(at sourceURL: URL, and destinationURL: URL) throws -> Bool {
+    let source = try attributesOfItem(atPath: sourceURL.resolvingSymlinksInPath().path)
+    let destination = try attributesOfItem(atPath: destinationURL.resolvingSymlinksInPath().path)
+    guard let sourceVolume = source[.systemNumber] as? NSNumber,
+          let sourceFile = source[.systemFileNumber] as? NSNumber,
+          let destinationVolume = destination[.systemNumber] as? NSNumber,
+          let destinationFile = destination[.systemFileNumber] as? NSNumber else {
+      return false
+    }
+
+    return sourceVolume == destinationVolume && sourceFile == destinationFile
+  }
+
   func fileExists(at url: URL) -> (fileExists: Bool, isDirectory: Bool) {
     var isDirectory: ObjCBool = false
     let fileExists = fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDirectory)

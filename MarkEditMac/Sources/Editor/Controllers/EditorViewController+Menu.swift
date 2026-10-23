@@ -157,6 +157,31 @@ extension EditorViewController {
   }
 }
 
+// MARK: - Window & Tabbing
+
+extension EditorViewController {
+  @IBAction func toggleWindowFloating(_ sender: Any?) {
+    view.window?.level = view.window?.level == .floating ? .normal : .floating
+  }
+
+  @IBAction func createNewTab(_ sender: Any?) {
+    let window = view.window
+    let tabbingMode = window?.tabbingMode
+
+    // Force tabbing without mutating the persisted preference
+    EditorWindow.forcedTabbing = true
+    window?.tabbingMode = .preferred
+    NSDocumentController.shared.newDocument(sender)
+
+    DispatchQueue.main.async {
+      EditorWindow.forcedTabbing = false
+      if let tabbingMode {
+        window?.tabbingMode = tabbingMode
+      }
+    }
+  }
+}
+
 // MARK: - Developer
 
 extension EditorViewController {
@@ -310,23 +335,6 @@ private extension EditorViewController {
     view.window?.performClose(sender)
   }
 
-  @IBAction func createNewTab(_ sender: Any?) {
-    let window = view.window
-    let tabbingMode = window?.tabbingMode
-
-    // Force tabbing without mutating the persisted preference
-    EditorWindow.forcedTabbing = true
-    window?.tabbingMode = .preferred
-    NSDocumentController.shared.newDocument(sender)
-
-    DispatchQueue.main.async {
-      EditorWindow.forcedTabbing = false
-      if let tabbingMode {
-        window?.tabbingMode = tabbingMode
-      }
-    }
-  }
-
   @IBAction func revealInFinder(_ sender: Any?) {
     guard let fileURL = document?.fileURL else { return }
     NSWorkspace.shared.activateFileViewerSelecting([fileURL])
@@ -394,15 +402,6 @@ private extension EditorViewController {
       currentInput.performTextAction(.redo, sender: sender)
     } else {
       NSApp.sendAction(#selector(redo(_:)), to: nil, from: sender)
-    }
-  }
-
-  @IBAction func selectWholeDocument(_ sender: Any?) {
-    // The default implementation "selectAll" only selects the viewport
-    if let currentInput {
-      currentInput.performTextAction(.selectAll, sender: sender)
-    } else {
-      NSApp.sendAction(#selector(selectAll(_:)), to: nil, from: sender)
     }
   }
 
@@ -498,14 +497,6 @@ private extension EditorViewController {
 
   @IBAction func zoomOut(_ sender: Any?) {
     webView.magnification = max(Constants.minimumZoomLevel, webView.magnification - 0.1)
-  }
-}
-
-// MARK: - Window
-
-private extension EditorViewController {
-  @IBAction func toggleWindowFloating(_ sender: Any?) {
-    view.window?.level = view.window?.level == .floating ? .normal : .floating
   }
 }
 

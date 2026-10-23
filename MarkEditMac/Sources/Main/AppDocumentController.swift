@@ -9,6 +9,7 @@ import AppKit
 import AppKitExtensions
 import MarkEditCore
 import MarkEditKit
+import QuickSearchUI
 
 /**
  Subclass of `NSDocumentController` to allow customizations.
@@ -19,8 +20,12 @@ final class AppDocumentController: NSDocumentController {
   static var suggestedTextEncoding: EditorTextEncoding?
   static var suggestedFilename: String?
 
-  override var maximumRecentDocumentCount: Int {
-    min(super.maximumRecentDocumentCount, 8)
+  override func noteNewRecentDocumentURL(_ url: URL) {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
+    super.noteNewRecentDocumentURL(url)
   }
 
   override func beginOpenPanel(_ openPanel: NSOpenPanel, forTypes inTypes: [String]?) async -> Int {
@@ -45,6 +50,7 @@ final class AppDocumentController: NSDocumentController {
 
     Self.suggestedTextEncoding = nil
     openPanel.showsHiddenFiles = AppPreferences.General.showHiddenFiles
+    openPanel.message = AppPreferences.General.hasUsedQuickSearch ? "" : Localized.QuickSearch.openPanelHint
     openPanel.relayoutAccessoryView()
 
     let onBecomeActive = NotificationCenter.default.addObserver(
@@ -81,7 +87,26 @@ final class AppDocumentController: NSDocumentController {
     }
 
     appearanceDidChange()
-    return await super.beginOpenPanel(openPanel, forTypes: inTypes)
+    let result = await QuickSearchController.interceptOpenPanelShortcut(
+      in: openPanel,
+      registerShortcut: { handler in
+        AppHotKeys.register(keyEquivalent: "O", modifiers: ["Shift", "Command"], handler: handler)
+      },
+      present: {
+        await super.beginOpenPanel(openPanel, forTypes: inTypes)
+      }
+    )
+
+    if result.quickSearchRequested {
+      // Let AppKit finish unwinding the cancelled panel before presenting another window
+      DispatchQueue.main.async {
+        if !NSApp.sendAction(#selector(AppDelegate.quickSearch(_:)), to: NSApp.delegate, from: nil) {
+          Logger.log(.error, "Unable to present Quick Search after dismissing the Open panel")
+        }
+      }
+    }
+
+    return result.response
   }
 
   override func openDocument(
@@ -89,6 +114,13 @@ final class AppDocumentController: NSDocumentController {
     display displayDocument: Bool,
     completionHandler: @escaping (NSDocument?, Bool, (any Error)?) -> Void
   ) {
+    if ApplicationEnvironment.isRunningTests {
+      // AppKit can route opens through the shared controller even when a test supplies its own.
+      // Do not preload the editor, which loads the user's installed extensions.
+      super.openDocument(withContentsOf: url, display: false, completionHandler: completionHandler)
+      return
+    }
+
     if url.isBinaryFile {
       // Dead loop prevention
       if Bundle.main.isDefaultApp(toOpen: url) {
@@ -119,6 +151,46 @@ final class AppDocumentController: NSDocumentController {
   }
 }
 
+// MARK: - Document Opening
+
+extension AppDocumentController {
+  func openDocument(
+    at url: URL,
+    target: OpenDocumentTarget,
+    relativeTo sourceWindow: NSWindow?
+  ) async throws {
+    let url = url.resolvingSymlinksInPath()
+    if document(for: url) == nil {
+      try url.ensureCanOpenInternally()
+      if !ApplicationEnvironment.isRunningTests {
+        await EditorPreloader.shared.prepareViewController()
+      }
+    }
+
+    // Bypass the override, which routes binary files to other apps
+    let (document, alreadyOpen) = try await super.openDocument(withContentsOf: url, display: false)
+    guard let document = document as? EditorDocument else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
+
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
+    if alreadyOpen {
+      document.showWindows()
+      return
+    }
+
+    document.makeWindowControllers()
+    guard let controller = document.windowControllers.first as? EditorWindowController else {
+      throw CocoaError(.fileReadUnknown)
+    }
+
+    try await controller.showWindow(target: target, relativeTo: sourceWindow)
+  }
+}
+
 // MARK: - Private
 
 private extension AppDocumentController {
@@ -145,5 +217,16 @@ private extension NSOpenPanel {
   /// For example, the animation of opening documents will sometimes be skipped.
   func relayoutAccessoryView() {
     accessoryView?.needsLayout = true
+  }
+}
+
+private extension URL {
+  /// Rejects binary files and directories other than TextBundles.
+  func ensureCanOpenInternally() throws {
+    let values = try resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+    let isTextBundle = values.isDirectory == true && pathExtension.lowercased() == "textbundle"
+    guard values.isRegularFile == true || isTextBundle, !isBinaryFile else {
+      throw CocoaError(.fileReadCorruptFile)
+    }
   }
 }

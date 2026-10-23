@@ -5,36 +5,38 @@
 //
 
 import AppKit
+import AppKitExtensions
 import SwiftUI
 import MarkEditKit
 
 /**
  UI to show statistics of text.
  */
+@MainActor
 public final class StatisticsController: NSViewController {
   private enum Constants {
-    static let contentWidth: Double = 240
-    static let contentHeight: Double = 288
+    static let contentWidth: Double = 266
+    static let contentHeight: Double = 314
     static let maxExtraRows: Int = 3
   }
 
-  private let modernStyle: Bool
   private let content: ReadableContentPair
   private let fileURL: URL?
   private let localizable: StatisticsLocalizable
   private let customRules: [StatisticsRule]
+  private let tintColor: NSColor?
   private var contentView: NSView?
 
   public init(
-    modernStyle: Bool,
     content: ReadableContentPair,
     fileURL: URL?,
+    tintColor: NSColor? = nil,
     localizable: StatisticsLocalizable,
     customRules: [StatisticsRule] = []
   ) {
-    self.modernStyle = modernStyle
     self.content = content
     self.fileURL = fileURL
+    self.tintColor = tintColor
     self.localizable = localizable
     self.customRules = customRules
     super.init(nibName: nil, bundle: nil)
@@ -52,6 +54,8 @@ public final class StatisticsController: NSViewController {
       width: Constants.contentWidth,
       height: Constants.contentHeight
     ))
+
+    view.layerBackgroundColor = tintColor
   }
 
   override public func viewDidLoad() {
@@ -101,7 +105,6 @@ public final class StatisticsController: NSViewController {
         )
 
         let contentView = NSHostingView(rootView: StatisticsView(
-          modernStyle: self.modernStyle,
           fullResult: fullResult,
           selectionResult: selectionResult,
           fullRuleResults: fullRuleResults,
@@ -127,8 +130,6 @@ public final class StatisticsController: NSViewController {
     contentView?.frame = view.bounds
   }
 }
-
-extension ReadableContentPair: @unchecked @retroactive Sendable {}
 
 // MARK: - Private
 

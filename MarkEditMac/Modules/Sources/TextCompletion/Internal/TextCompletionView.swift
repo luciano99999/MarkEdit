@@ -7,11 +7,11 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct TextCompletionView: View {
   private var state: TextCompletionState
-  private let modernStyle: Bool
   private let localizable: TextCompletionLocalizable
-  private let commitCompletion: () -> Void
+  private let commitCompletion: @MainActor () -> Void
 
   private enum Constants {
     static let fontSize: Double = 14
@@ -22,12 +22,10 @@ struct TextCompletionView: View {
   }
 
   init(
-    modernStyle: Bool,
     state: TextCompletionState,
     localizable: TextCompletionLocalizable,
-    commitCompletion: @escaping () -> Void
+    commitCompletion: @escaping @MainActor () -> Void
   ) {
-    self.modernStyle = modernStyle
     self.state = state
     self.localizable = localizable
     self.commitCompletion = commitCompletion
@@ -42,7 +40,7 @@ struct TextCompletionView: View {
               ZStack(alignment: .leading) {
                 if index == state.selectedIndex {
                   Color.accentColor.clipShape(RoundedRectangle(
-                    cornerRadius: modernStyle ? 5.5 : 3.5,
+                    cornerRadius: 5.5,
                     style: .continuous
                   ))
                 }
@@ -61,7 +59,7 @@ struct TextCompletionView: View {
                 }())
                 .font(.system(size: Constants.fontSize))
                 .foregroundColor(index == state.selectedIndex ? .white : .primary.opacity(0.75))
-                .padding([.leading, .trailing], Constants.itemPadding + (modernStyle ? 2 : 0))
+                .padding([.leading, .trailing], Constants.itemPadding + 2)
               }
               .frame(
                 maxWidth: .infinity,
@@ -71,14 +69,14 @@ struct TextCompletionView: View {
               .accessibilityHint(index == state.selectedIndex ? localizable.selectedHint : "")
               .contentShape(Rectangle())
               .simultaneousGesture(
-                DragGesture(minimumDistance: 0).onChanged { _ in
+                selectionDragGesture.onChanged { _ in
                   state.selectedIndex = index
                 }
                 .onEnded {
                   let bounds = CGRect(
                     x: 0,
                     y: 0,
-                    width: Constants.minimumItemWidth + (modernStyle ? 4 : 0),
+                    width: Constants.minimumItemWidth + 4,
                     height: Constants.itemHeight
                   )
 
@@ -87,6 +85,7 @@ struct TextCompletionView: View {
                   }
                 }
               )
+              .simultaneousGesture(completionTapGesture(index: index))
             }
           }
         }.onChange(of: state.selectedIndex) {
@@ -113,5 +112,29 @@ struct TextCompletionView: View {
       width: width + 2 * Constants.itemPadding,
       height: height + 2 * Constants.itemPadding
     )
+  }
+}
+
+// MARK: - Private
+
+private extension TextCompletionView {
+  var selectionDragGesture: DragGesture {
+    if #available(macOS 27.0, *) {
+      // Finger drags belong to the scroll view, not row selection
+      DragGesture(minimumDistance: 0, inputKinds: .pointer)
+    } else {
+      DragGesture(minimumDistance: 0)
+    }
+  }
+
+  func completionTapGesture(index: Int) -> (some Gesture)? {
+    if #available(macOS 27.0, *) {
+      SpatialTapGesture(inputKinds: .directTouch).onEnded { _ in
+        state.selectedIndex = index
+        commitCompletion()
+      }
+    } else {
+      nil
+    }
   }
 }

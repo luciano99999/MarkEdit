@@ -8,16 +8,21 @@ const readHtml = () => {
 };
 
 describe('Build system', () => {
-  test('test existence of magic variables', () => {
+  test('magic variables occur once, with config before settings', () => {
     const html = readHtml();
-    expect(html).toContain('"{{EDITOR_CONFIG}}"');
-    expect(html).toContain('"{{USER_SETTINGS}}"');
+    const config = '"{{EDITOR_CONFIG}}"';
+    const settings = '"{{USER_SETTINGS}}"';
+
+    expect(html.split(config)).toHaveLength(2);
+    expect(html.split(settings)).toHaveLength(2);
+    expect(html.indexOf(config)).toBeLessThan(html.indexOf(settings));
   });
 
   test('test everything is inlined in a single file', () => {
     const html = readHtml();
-    expect(html).not.toMatch(/<script[^>]*\ssrc=/i);
-    expect(html).not.toMatch(/<link[^>]*\srel=["']?stylesheet/i);
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    expect(document.querySelector('script[src]')).toBeNull();
+    expect(document.querySelector('link[rel="stylesheet"]')).toBeNull();
     expect(html).not.toContain('chunk-loader');
   });
 });

@@ -14,8 +14,8 @@ import MarkEditKit
 ///
 /// The underlying file is stored as "settings.json" in AppCustomization.
 enum AppRuntimeConfig {
-  struct Definition: Codable {
-    enum ToolbarTranslucency: Codable {
+  struct Definition: Codable, Sendable {
+    enum ToolbarTranslucency: Codable, Sendable {
       case readable
       case `default`
       case vibrant
@@ -29,6 +29,12 @@ enum AppRuntimeConfig {
       ///
       /// Custom values are used as-is and need not follow these relationships.
       var material: (backdropBlur: Double, tintedOpacity: Double, plainOpacity: Double) {
+      #if DEBUG
+        if ProcessInfo.processInfo.environment["DEBUG_TAKING_SCREENSHOTS"] == "YES" {
+          return (16, 0.9, 0.6)
+        }
+      #endif
+
         switch self {
         case .readable: return (16, 0.9, 0.6)
         case .default: return (8, 0.7, 0.4)
@@ -72,14 +78,14 @@ enum AppRuntimeConfig {
       }
     }
 
-    enum UpdateBehavior: String, Codable {
+    enum UpdateBehavior: String, Codable, Sendable {
       case never = "never"         // Don't check for updates
       case quiet = "quiet"         // Only reveal the update menu
       case notify = "notify"       // Always ask with an alert
       case automatic = "automatic" // Download silently and install on quit
     }
 
-    struct HotKey: Codable {
+    struct HotKey: Codable, Sendable {
       let key: String
       let modifiers: [String]
     }
@@ -103,6 +109,7 @@ enum AppRuntimeConfig {
     let checksForUpdates: Bool? // [Deprecated] Kept for backward compatibility
     let defaultOpenDirectory: String?
     let defaultSaveDirectory: String?
+    let disableDebugFiles: Bool?
     let disableOpenPanelOptions: Bool?
     let disableCorsRestrictions: Bool?
     let disabledWebKitFeatures: [String]?
@@ -129,6 +136,7 @@ enum AppRuntimeConfig {
       case checksForUpdates = "general.checksForUpdates"
       case defaultOpenDirectory = "general.defaultOpenDirectory"
       case defaultSaveDirectory = "general.defaultSaveDirectory"
+      case disableDebugFiles = "general.disableDebugFiles"
       case disableOpenPanelOptions = "general.disableOpenPanelOptions"
       case disableCorsRestrictions = "general.disableCorsRestrictions"
       case disabledWebKitFeatures = "general.disabledWebKitFeatures"
@@ -248,16 +256,18 @@ enum AppRuntimeConfig {
     currentDefinition?.defaultSaveDirectory
   }
 
-  static var disableOpenPanelOptions: Bool {
-    currentDefinition?.disableOpenPanelOptions ?? ({
-      // [macOS 26] Revisit this later,
-      // NSOpenPanel.accessoryView can significantly slow down the file opening process.
-      if #available(macOS 26.0, *) {
-        return true
-      }
+  static var disableDebugFiles: Bool {
+    currentDefinition?.disableDebugFiles ?? false
+  }
 
-      return false
-    })()
+  static var disableOpenPanelOptions: Bool {
+    if let option = currentDefinition?.disableOpenPanelOptions {
+      return option
+    }
+
+    // [macOS 26] Revisit this later,
+    // NSOpenPanel.accessoryView can significantly slow down the file opening process.
+    return true
   }
 
   static var disableCorsRestrictions: Bool {
@@ -285,7 +295,7 @@ enum AppRuntimeConfig {
   }
 }
 
-struct CustomToolbarItem: Codable {
+struct CustomToolbarItem: Codable, Sendable {
   let title: String
   let icon: String
   let actionName: String?
@@ -332,6 +342,7 @@ private extension AppRuntimeConfig {
     checksForUpdates: nil,
     defaultOpenDirectory: nil,
     defaultSaveDirectory: nil,
+    disableDebugFiles: false,
     disableOpenPanelOptions: nil, // [macOS 26] Future macOS with the fix can be opted out
     disableCorsRestrictions: true,
     disabledWebKitFeatures: nil,

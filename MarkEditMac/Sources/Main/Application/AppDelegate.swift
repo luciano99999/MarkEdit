@@ -8,6 +8,7 @@ import AppKit
 import AppKitExtensions
 import ExtensionCore
 import SettingsUI
+import QuickSearchUI
 import MarkEditCore
 import MarkEditKit
 
@@ -22,7 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @IBOutlet weak var copyPandocCommandMenu: NSMenu?
   @IBOutlet weak var openFileInMenu: NSMenu?
+  @IBOutlet weak var openRecentMenu: NSMenu?
   @IBOutlet weak var reopenFileMenu: NSMenu?
+  @IBOutlet weak var bookmarksMenu: NSMenu?
   @IBOutlet weak var lineEndingsMenu: NSMenu?
   @IBOutlet weak var editCommandsMenu: NSMenu?
   @IBOutlet weak var editTableOfContentsMenu: NSMenu?
@@ -59,19 +62,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   @IBOutlet weak var postponeUpdateItem: NSMenuItem?
   @IBOutlet weak var ignoreUpdateItem: NSMenuItem?
 
+  lazy var bookmarkStore = BookmarkStore.shared
   private var appearanceObservation: NSKeyValueObservation?
   private var settingsWindowController: NSWindowController?
 
+  var quickSearchController: QuickSearchController?
+  weak var quickSearchSourceWindow: NSWindow?
+
   func applicationWillFinishLaunching(_ notification: Notification) {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
     NSApp.appearance = AppPreferences.General.appearance.resolved()
     EditorPreloader.shared.warmUp()
   }
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
     AppDesign.migrateMainMenuIcons(delegate: self)
     appearanceObservation = NSApp.observe(\.effectiveAppearance) { _, _ in
       Task { @MainActor in
         AppTheme.current.updateAppearance()
+        NSApp.appDelegate?.updateQuickSearchAppearance()
       }
     }
 
@@ -123,6 +139,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
 
       DispatchQueue.global(qos: .utility).async {
+        guard !AppRuntimeConfig.disableDebugFiles else {
+          return
+        }
+
         let defaults = UserDefaults.standard.dictionaryRepresentation()
         let plist = defaults.merging(AppRuntimeConfig.jsonObject) { _, rhs in rhs }
         let fileData = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
@@ -157,6 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationShouldTerminate(_ application: NSApplication) -> NSApplication.TerminateReply {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return .terminateNow
+    }
+
     if AppRuntimeConfig.autoSaveWhenIdle && NSDocumentController.shared.hasOutdatedDocuments {
       // Terminate after all outdated documents are saved
       Task {
@@ -171,12 +195,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
     AppRelauncher.commit()
     AppUpdater.commitStagedUpdate()
     EditorSelectionHistory.purgeStaleEntries()
   }
 
   func shouldOpenOrCreateDocument() -> Bool {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return false
+    }
+
     if let settingsWindow = settingsWindowController?.window {
       // We don't open or create documents when the settings pane is the key and visible
       return !(settingsWindow.isKeyWindow && settingsWindow.isVisible)
@@ -190,6 +222,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate {
   func application(_ application: NSApplication, open urls: [URL]) {
+    guard !ApplicationEnvironment.isRunningTests else {
+      return
+    }
+
     for url in urls {
       // https://github.com/MarkEdit-app/MarkEdit/wiki/Manual#using-url-schemes
       let components = URLComponents(url: url, resolvingAgainstBaseURL: false)

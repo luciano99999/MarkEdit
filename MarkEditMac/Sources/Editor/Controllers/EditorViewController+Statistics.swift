@@ -26,9 +26,9 @@ extension EditorViewController {
       }
 
       let statisticsController = StatisticsController(
-        modernStyle: AppDesign.modernStyle,
         content: content,
         fileURL: document?.fileURL,
+        tintColor: transientTintColor(for: .current),
         localizable: StatisticsLocalizable(
           mainTitle: Localized.Toolbar.statistics,
           selection: Localized.Statistics.selection,
@@ -49,7 +49,8 @@ extension EditorViewController {
         asPopoverRelativeTo: sourceView.bounds,
         of: sourceView,
         preferredEdge: .maxY,
-        behavior: .semitransient
+        behavior: .semitransient,
+        hasFullSizeContent: true
       )
     }
   }

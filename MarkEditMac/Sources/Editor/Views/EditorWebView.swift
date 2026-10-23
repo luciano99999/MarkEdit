@@ -65,6 +65,11 @@ final class EditorWebView: WKWebView {
   static let userDefinedContextMenuID = NSUserInterfaceItemIdentifier("userDefinedContextMenu")
   weak var actionDelegate: EditorWebViewActionDelegate?
 
+  override func selectAll(_ sender: Any?) {
+    // The default implementation "selectAll" only selects the viewport
+    actionDelegate?.editorWebView(self, didPerform: .selectAll, sender: sender)
+  }
+
   override func mouseDown(with event: NSEvent) {
     super.mouseDown(with: event)
     actionDelegate?.editorWebView(self, mouseDownWith: event)
@@ -121,25 +126,22 @@ final class EditorWebView: WKWebView {
       action: #selector(selectAllOccurrences(_:))
     )
 
-    if AppDesign.menuIconEvolution {
-      findSelectionItem.image = NSImage(systemSymbolName: "text.page.badge.magnifyingglass")
-      selectAllOccurrencesItem.image = NSImage(systemSymbolName: "selection.pin.in.out")
-    }
+    findSelectionItem.image = NSImage(systemSymbolName: "text.page.badge.magnifyingglass")
+    selectAllOccurrencesItem.image = NSImage(systemSymbolName: "selection.pin.in.out")
 
     // Only add text format items when it's not read-only
     if !(actionDelegate?.editorWebViewIsReadOnlyMode(self) ?? false) {
       let item = NSMenuItem()
+      item.image = NSImage(systemSymbolName: "bold.italic.underline")
       item.title = Localized.Toolbar.textFormat
       item.submenu = NSApp.appDelegate?.textFormatMenu?.copiedMenu
-
-      if AppDesign.menuIconEvolution {
-        item.image = NSImage(systemSymbolName: "bold.italic.underline")
-      }
-
       menu.addItem(item)
     }
 
-    menu.addItem(.separator())
+    if #unavailable(macOS 27.0) {
+      menu.addItem(.separator())
+    }
+
     updateMenuItems(menu: menu)
     super.willOpenMenu(menu, with: event)
 
@@ -202,12 +204,9 @@ private extension EditorWebView {
         //
         // WKWebView.showInspector() in WKWebView+Extension.swift does the heavy lifting
         if item.identifier == NSUserInterfaceItemIdentifier.inspectElement {
+          item.image = NSImage(systemSymbolName: "ladybug")
           item.keyEquivalent = "i"
           item.keyEquivalentModifierMask = [.option, .command]
-
-          if AppDesign.menuIconEvolution {
-            item.image = NSImage(systemSymbolName: "ladybug")
-          }
         }
 
         // Disable copy, cut for empty selection (always enable on editor blur)

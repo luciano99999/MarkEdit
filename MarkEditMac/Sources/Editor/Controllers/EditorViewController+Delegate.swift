@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import AppKitExtensions
 import WebKit
 import MarkEditCore
 import MarkEditKit
@@ -181,6 +182,7 @@ extension EditorViewController: EditorModuleCoreDelegate {
   func editorCoreBackgroundColorDidChange(_ sender: EditorModuleCore, color: UInt32, alpha: Double) {
     webBackgroundColor = NSColor(hexCode: color, alpha: alpha)
     updateWindowColors(.current)
+    updateVisibleTransientTintColors(for: .current)
     AppPreferences.Window.cachedBackgroundColor = .init(hex: color, alpha: alpha)
   }
 
@@ -218,6 +220,10 @@ extension EditorViewController: EditorModuleCoreDelegate {
 
     if contentEdited {
       document?.isOutdated = true
+
+      if view.window === NSApp.appDelegate?.quickSearchSourceWindow {
+        NSApp.appDelegate?.quickSearchController?.refreshDocument()
+      }
 
       // Window restoration is enabled, explicit autosave to prevent data loss
       if document?.fileURL == nil && AppPreferences.General.quitAlwaysKeepsWindows {
@@ -342,17 +348,24 @@ extension EditorViewController: EditorModuleCompletionDelegate {
   }
 }
 
-// MARK: - EditorModulePreviewDelegate
-
-extension EditorViewController: EditorModulePreviewDelegate {
-  func editorPreview(_ sender: EditorModulePreview, show code: String, type: PreviewType, rect: CGRect) {
-    showPreview(code: code, type: type, rect: rect)
-  }
-}
-
 // MARK: - EditorModuleAPIDelegate
 
 extension EditorViewController: EditorModuleAPIDelegate {
+  func editorAPI(_ sender: EditorModuleAPI, openDocument fileURL: URL, target: OpenDocumentTarget) async -> Bool {
+    guard let controller = NSDocumentController.shared as? AppDocumentController else {
+      Logger.log(.error, "Missing AppDocumentController")
+      return false
+    }
+
+    do {
+      try await controller.openDocument(at: fileURL, target: target, relativeTo: viewIfLoaded?.window)
+      return true
+    } catch {
+      Logger.log(.error, "Failed to open document: \(error.localizedDescription)")
+      return false
+    }
+  }
+
   func editorAPISaveDocument(_ sender: EditorModuleAPI) async -> Bool {
     guard let document else {
       return false
@@ -375,8 +388,8 @@ extension EditorViewController: EditorModuleAPIDelegate {
     addMainMenuItems(items: items)
   }
 
-  func editorAPI(_ sender: EditorModuleAPI, showContextMenu items: [WebMenuItem], location: WebPoint) {
-    showContextMenu(items: items, location: location.cgPoint)
+  func editorAPI(_ sender: EditorModuleAPI, showContextMenu items: [WebMenuItem], location: WebPoint, highlightedIndex: Int?) {
+    showContextMenu(items: items, location: location.cgPoint, highlightedIndex: highlightedIndex)
   }
 
   func editorAPI(
@@ -425,7 +438,7 @@ extension EditorViewController: EditorModuleAPIDelegate {
     }
 
     document.stringValue = content
-    resetEditor()
+    resetEditor(resetSelection: true)
     await waitUntilEditorReset()
     await document.waitUntilSaveCompleted()
     return true
@@ -449,6 +462,35 @@ extension EditorViewController: EditorModuleFoundationModelsDelegate {
     response: LanguageModelResponse
   ) {
     bridge.foundationModels.applyStreamUpdate(streamID: streamID, response: response)
+  }
+}
+
+// MARK: - EditorModuleSecretStorageDelegate
+
+extension EditorViewController: EditorModuleSecretStorageDelegate {
+  func confirmSecretAccess(extensionID: String, path: String, key: String) async throws {
+    let scriptURL = URL(fileURLWithPath: path)
+    let displayPath = scriptURL == AppCustomization.editorScript.fileURL
+      ? "Documents ‣ editor.js"
+      : "Documents ‣ scripts ‣ \(scriptURL.lastPathComponent)"
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.icon = NSApp.applicationIconImage
+    alert.messageText = String(format: Localized.SecretStorage.title, extensionID)
+    alert.informativeText = String(format: Localized.SecretStorage.message, key, displayPath)
+    alert.addButton(withTitle: Localized.SecretStorage.allowThisRead)
+
+    let learnMoreButton = alert.addButton(withTitle: Localized.General.learnMore)
+    learnMoreButton.addAction {
+      NSWorkspace.shared.safelyOpenURL(string: "https://github.com/MarkEdit-app/MarkEdit/wiki/Manual#extension-credentials")
+    }
+
+    // The "Cancel" button will always be the last one as long as Escape key is assigned
+    alert.addButton(withTitle: Localized.SecretStorage.dontAllowRead).keyEquivalent = "\u{1b}"
+
+    if await presentSheetModal(alert) != .alertFirstButtonReturn {
+      throw SecretStorageError.cancelled
+    }
   }
 }
 

@@ -18,17 +18,18 @@ import { pseudoDocument } from './test/utils/mock';
 import { createNativeModule } from './src/bridge/nativeModule';
 import { NativeModuleCore } from './src/bridge/native/core';
 import { NativeModuleCompletion } from './src/bridge/native/completion';
-import { NativeModulePreview } from './src/bridge/native/preview';
 import { NativeModuleTokenizer } from './src/bridge/native/tokenizer';
 import { NativeModuleAPI } from './src/bridge/native/api';
 import { NativeModuleFoundationModels } from './src/bridge/native/foundationModels';
 import { NativeModuleTranslation } from './src/bridge/native/translation';
+import { NativeModuleSecretStorage } from './src/bridge/native/secretStorage';
 
 import { resetEditor } from './src/core';
 import { initThemeExtractors, initMarkEditModules } from './src/api/modules';
 import { setUp, applyReducedMotion } from './src/styling/config';
 import { loadTheme } from './src/styling/themes';
 import { startObserving } from './src/modules/events';
+import { createScriptRunner } from './src/scriptContext';
 import { setUpQuickLook } from './src/@quicklook';
 
 // In release mode, window.config = "{{EDITOR_CONFIG}}" will be replaced with a JSON literal
@@ -53,6 +54,7 @@ const config = import.meta.env.PROD ? window.config : {
   standardDirectories: {},
   localizable: {
     previewButtonTitle: 'Preview',
+    closeButtonTitle: 'Close',
     cmdClickToFollow: '⌘-click to follow',
     cmdClickToToggleTodo: '⌘-click to toggle todo',
   },
@@ -62,12 +64,24 @@ const config = import.meta.env.PROD ? window.config : {
 window.nativeModules = {
   core: createNativeModule<NativeModuleCore>('core'),
   completion: createNativeModule<NativeModuleCompletion>('completion'),
-  preview: createNativeModule<NativeModulePreview>('preview'),
   tokenizer: createNativeModule<NativeModuleTokenizer>('tokenizer'),
   api: createNativeModule<NativeModuleAPI>('api'),
   foundationModels: createNativeModule<NativeModuleFoundationModels>('foundationModels'),
   translation: createNativeModule<NativeModuleTranslation>('translation'),
+  secretStorage: createNativeModule<NativeModuleSecretStorage>('secretStorage'),
 };
+
+let scriptContextsPrepared = false;
+Object.defineProperty(window, '__prepareScriptContexts__', {
+  value: (scripts: Parameters<typeof createScriptRunner>[0]) => {
+    if (scriptContextsPrepared) {
+      throw new Error('Script contexts are already prepared.');
+    }
+
+    scriptContextsPrepared = true;
+    Object.defineProperty(window, '__runScriptWithContext__', { value: createScriptRunner(scripts) });
+  },
+});
 
 switch (config.host) {
   case Host.mainApp: setUpMainApp(config); break;

@@ -1,6 +1,7 @@
 import { WidgetView } from './types';
 import { PreviewType } from '../../modules/preview';
 import { globalState } from '../../common/store';
+import { adjustAlpha } from '../helper';
 
 /**
  * Widget used to show a [preview] button after some contents, such as mermaid diagrams.
@@ -14,14 +15,13 @@ export class PreviewWidget extends WidgetView {
     const span = document.createElement('span');
     span.className = 'cm-md-previewWrapper';
 
-    const color = `${globalState.colors?.text ?? '#666666'}20`;
+    const color = adjustAlpha(globalState.colors?.text ?? '#666666', 0.125);
     span.addEventListener('mouseenter', () => span.style.background = color);
     span.addEventListener('mouseleave', () => span.style.background = '');
 
     const button = span.appendChild(document.createElement('span'));
     button.dataset.code = this.code;
     button.dataset.type = this.type;
-    button.dataset.pos = `${this.pos}`;
 
     button.title = window.config.localizable?.previewButtonTitle ?? '';
     button.className = 'cm-md-previewButton';

@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import MarkEditKit
 
 final class EditorWindowController: NSWindowController, NSWindowDelegate {
   var autosavedFrame: CGRect?
@@ -32,12 +33,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
       let callerTabbingPreference = NSWindow.allowsAutomaticWindowTabbing
 
       Task { @MainActor [weak self] in
-        guard let self else {
+        guard let self, await self.windowReadyForPresentation() != nil else {
           return
         }
-
-        // Defer the actual show until the editor finishes its first paint
-        await self.editorViewController?.waitUntilEditorReset()
 
         let tabbingToRestore = NSWindow.allowsAutomaticWindowTabbing
         NSWindow.allowsAutomaticWindowTabbing = callerTabbingPreference
@@ -50,6 +48,14 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     }
 
     showWindowImmediately(sender)
+  }
+
+  override func newWindowForTab(_ sender: Any?) {
+    guard let editorViewController else {
+      return Logger.assertFail("Missing editorViewController")
+    }
+
+    editorViewController.createNewTab(sender)
   }
 
   func windowDidBecomeMain(_ notification: Notification) {
@@ -89,7 +95,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
     editorViewController?.bridge.core.handleFocusLost()
   }
 
-  func windowShouldZoom(_ window: NSWindow, toFrame newFrame: NSRect) -> Bool {
+  func windowShouldZoom(_ window: NSWindow, toFrame newFrame: CGRect) -> Bool {
     // By default, zooming a window doesn't clear the tiling state,
     // this is different from moving or resizing the window.
     //
@@ -128,6 +134,30 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate {
   }
 }
 
+// MARK: - Document Opening
+
+extension EditorWindowController {
+  func showWindow(target: OpenDocumentTarget, relativeTo sourceWindow: NSWindow?) async throws {
+    guard let window = await windowReadyForPresentation() else {
+      throw CancellationError()
+    }
+
+    let tabbingMode = window.tabbingMode
+    if target != .automatic {
+      window.tabbingMode = .disallowed
+    }
+
+    showWindowImmediately(nil)
+    window.tabbingMode = tabbingMode
+
+    if target == .tab, let sourceWindow, sourceWindow !== window, sourceWindow.isVisible {
+      sourceWindow.addTabbedWindow(window, ordered: .above)
+      sourceWindow.tabGroup?.selectedWindow = window
+      window.makeKeyAndOrderFront(nil)
+    }
+  }
+}
+
 // MARK: - Private
 
 private extension EditorWindowController {
@@ -141,6 +171,15 @@ private extension EditorWindowController {
     }
 
     return editor.hasFinishedLoading && editor.pendingResetCount > 0
+  }
+
+  func windowReadyForPresentation() async -> NSWindow? {
+    if shouldWaitResetting {
+      await editorViewController?.waitUntilEditorReset()
+    }
+
+    // The document may have closed while waiting for the editor
+    return document != nil ? window : nil
   }
 
   func showWindowImmediately(_ sender: Any?) {

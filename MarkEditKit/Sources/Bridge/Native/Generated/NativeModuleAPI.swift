@@ -12,13 +12,17 @@ import MarkEditCore
 
 @MainActor
 public protocol NativeModuleAPI: NativeModule {
+  func openDocument(path: String, target: NativeModuleAPIOpenDocumentTarget?) async -> Bool
   func saveDocument() async -> Bool
   func closeDocument() async -> Bool
+  func recentDocumentPaths() async -> [String]
   func addMainMenuItems(items: [WebMenuItem])
-  func showContextMenu(items: [WebMenuItem], location: WebPoint)
+  func showContextMenu(items: [WebMenuItem], location: WebPoint, highlightedIndex: Int?)
   func showAlert(title: String?, message: String?, buttons: [String]?) async -> Int
   func showTextBox(title: String?, placeholder: String?, defaultValue: String?) async -> String?
+  func showOpenPanel(options: OpenPanelOptions) async -> [String]?
   func showSavePanel(options: SavePanelOptions) async -> Bool
+  func showPrintPanel(options: PrintPanelOptions) async -> Bool
   func runService(name: String, input: String?) async -> Bool
   func openFile(path: String) async -> Bool
   func createFile(options: CreateFileOptions) async -> Bool
@@ -32,11 +36,12 @@ public protocol NativeModuleAPI: NativeModule {
   func getFileVersions() async -> String?
   func getFileVersionContent(id: String) async -> String?
   func restoreFileVersion(id: String) async -> Bool
-  func deleteFileVersions(ids: [String]) async -> Bool
+  func deleteLocalFileVersions(ids: [String]) async -> Bool
   func getPasteboardItems() async -> String?
   func getPasteboardString() async -> String?
   func terminateApp()
   func relaunchApp()
+  func playSystemBeep()
 }
 
 public extension NativeModuleAPI {
@@ -56,10 +61,14 @@ final class NativeBridgeAPI: NativeBridge {
 
   func invoke(method: String, parameters: Data) async -> Result<Any?, Error>? {
     switch method {
+    case "openDocument":
+      return await openDocument(parameters: parameters)
     case "saveDocument":
       return await saveDocument(parameters: parameters)
     case "closeDocument":
       return await closeDocument(parameters: parameters)
+    case "recentDocumentPaths":
+      return await recentDocumentPaths(parameters: parameters)
     case "addMainMenuItems":
       return await addMainMenuItems(parameters: parameters)
     case "showContextMenu":
@@ -68,8 +77,12 @@ final class NativeBridgeAPI: NativeBridge {
       return await showAlert(parameters: parameters)
     case "showTextBox":
       return await showTextBox(parameters: parameters)
+    case "showOpenPanel":
+      return await showOpenPanel(parameters: parameters)
     case "showSavePanel":
       return await showSavePanel(parameters: parameters)
+    case "showPrintPanel":
+      return await showPrintPanel(parameters: parameters)
     case "runService":
       return await runService(parameters: parameters)
     case "openFile":
@@ -96,8 +109,8 @@ final class NativeBridgeAPI: NativeBridge {
       return await getFileVersionContent(parameters: parameters)
     case "restoreFileVersion":
       return await restoreFileVersion(parameters: parameters)
-    case "deleteFileVersions":
-      return await deleteFileVersions(parameters: parameters)
+    case "deleteLocalFileVersions":
+      return await deleteLocalFileVersions(parameters: parameters)
     case "getPasteboardItems":
       return await getPasteboardItems(parameters: parameters)
     case "getPasteboardString":
@@ -106,9 +119,35 @@ final class NativeBridgeAPI: NativeBridge {
       return await terminateApp(parameters: parameters)
     case "relaunchApp":
       return await relaunchApp(parameters: parameters)
+    case "playSystemBeep":
+      return await playSystemBeep(parameters: parameters)
     default:
       return nil
     }
+  }
+
+  private func openDocument(parameters: Data) async -> Result<Any?, Error>? {
+    struct Message: Decodable {
+      var path: String
+      var target: NativeModuleAPIOpenDocumentTarget?
+
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: BridgeFieldKey.self)
+        path = try container.value("path")
+        target = try container.value("target")
+      }
+    }
+
+    let message: Message
+    do {
+      message = try decoder.decode(Message.self, from: parameters)
+    } catch {
+      Logger.assertFail("Failed to decode parameters: \(parameters)")
+      return .failure(error)
+    }
+
+    let result = await module.openDocument(path: message.path, target: message.target)
+    return .success(result)
   }
 
   private func saveDocument(parameters: Data) async -> Result<Any?, Error>? {
@@ -118,6 +157,11 @@ final class NativeBridgeAPI: NativeBridge {
 
   private func closeDocument(parameters: Data) async -> Result<Any?, Error>? {
     let result = await module.closeDocument()
+    return .success(result)
+  }
+
+  private func recentDocumentPaths(parameters: Data) async -> Result<Any?, Error>? {
+    let result = await module.recentDocumentPaths()
     return .success(result)
   }
 
@@ -147,11 +191,13 @@ final class NativeBridgeAPI: NativeBridge {
     struct Message: Decodable {
       var items: [WebMenuItem]
       var location: WebPoint
+      var highlightedIndex: Int?
 
       init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: BridgeFieldKey.self)
         items = try container.value("items")
         location = try container.value("location")
+        highlightedIndex = try container.value("highlightedIndex")
       }
     }
 
@@ -163,7 +209,7 @@ final class NativeBridgeAPI: NativeBridge {
       return .failure(error)
     }
 
-    module.showContextMenu(items: message.items, location: message.location)
+    module.showContextMenu(items: message.items, location: message.location, highlightedIndex: message.highlightedIndex)
     return .success(nil)
   }
 
@@ -219,6 +265,28 @@ final class NativeBridgeAPI: NativeBridge {
     return .success(result)
   }
 
+  private func showOpenPanel(parameters: Data) async -> Result<Any?, Error>? {
+    struct Message: Decodable {
+      var options: OpenPanelOptions
+
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: BridgeFieldKey.self)
+        options = try container.value("options")
+      }
+    }
+
+    let message: Message
+    do {
+      message = try decoder.decode(Message.self, from: parameters)
+    } catch {
+      Logger.assertFail("Failed to decode parameters: \(parameters)")
+      return .failure(error)
+    }
+
+    let result = await module.showOpenPanel(options: message.options)
+    return .success(result)
+  }
+
   private func showSavePanel(parameters: Data) async -> Result<Any?, Error>? {
     struct Message: Decodable {
       var options: SavePanelOptions
@@ -238,6 +306,28 @@ final class NativeBridgeAPI: NativeBridge {
     }
 
     let result = await module.showSavePanel(options: message.options)
+    return .success(result)
+  }
+
+  private func showPrintPanel(parameters: Data) async -> Result<Any?, Error>? {
+    struct Message: Decodable {
+      var options: PrintPanelOptions
+
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: BridgeFieldKey.self)
+        options = try container.value("options")
+      }
+    }
+
+    let message: Message
+    do {
+      message = try decoder.decode(Message.self, from: parameters)
+    } catch {
+      Logger.assertFail("Failed to decode parameters: \(parameters)")
+      return .failure(error)
+    }
+
+    let result = await module.showPrintPanel(options: message.options)
     return .success(result)
   }
 
@@ -512,7 +602,7 @@ final class NativeBridgeAPI: NativeBridge {
     return .success(result)
   }
 
-  private func deleteFileVersions(parameters: Data) async -> Result<Any?, Error>? {
+  private func deleteLocalFileVersions(parameters: Data) async -> Result<Any?, Error>? {
     struct Message: Decodable {
       var ids: [String]
 
@@ -530,7 +620,7 @@ final class NativeBridgeAPI: NativeBridge {
       return .failure(error)
     }
 
-    let result = await module.deleteFileVersions(ids: message.ids)
+    let result = await module.deleteLocalFileVersions(ids: message.ids)
     return .success(result)
   }
 
@@ -553,10 +643,21 @@ final class NativeBridgeAPI: NativeBridge {
     module.relaunchApp()
     return .success(nil)
   }
+
+  private func playSystemBeep(parameters: Data) async -> Result<Any?, Error>? {
+    module.playSystemBeep()
+    return .success(nil)
+  }
+}
+
+public enum NativeModuleAPIOpenDocumentTarget: String, Codable, Sendable {
+  case automatic = "automatic"
+  case window = "window"
+  case tab = "tab"
 }
 
 /// Represents a menu item in native menus.
-public struct WebMenuItem: Decodable {
+public struct WebMenuItem: Decodable, Sendable {
   public var separator: Bool
   public var title: String?
   public var icon: String?
@@ -591,7 +692,7 @@ public struct WebMenuItem: Decodable {
 }
 
 /// "CGPoint-fashion" point.
-public struct WebPoint: Decodable {
+public struct WebPoint: Decodable, Sendable {
   public var x: Double
   public var y: Double
 
@@ -607,7 +708,43 @@ public struct WebPoint: Decodable {
   }
 }
 
-public struct SavePanelOptions: Decodable {
+public struct OpenPanelOptions: Decodable, Sendable {
+  /// Panel title. Uses the system default if omitted.
+  public var title: String?
+  /// Instructions displayed in the panel.
+  public var message: String?
+  /// Confirmation button label. Uses the system default if omitted.
+  public var prompt: String?
+  /// Types of items that can be selected. Defaults to 'files'.
+  public var selectionType: OpenPanelOptionsMembersSelectionTypeType?
+  /// Allow selecting multiple items. Defaults to false.
+  public var allowsMultipleSelection: Bool?
+
+  public init(title: String?, message: String?, prompt: String?, selectionType: OpenPanelOptionsMembersSelectionTypeType?, allowsMultipleSelection: Bool?) {
+    self.title = title
+    self.message = message
+    self.prompt = prompt
+    self.selectionType = selectionType
+    self.allowsMultipleSelection = allowsMultipleSelection
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: BridgeFieldKey.self)
+    title = try container.value("title")
+    message = try container.value("message")
+    prompt = try container.value("prompt")
+    selectionType = try container.value("selectionType")
+    allowsMultipleSelection = try container.value("allowsMultipleSelection")
+  }
+}
+
+public enum OpenPanelOptionsMembersSelectionTypeType: String, Codable, Sendable {
+  case files = "files"
+  case directories = "directories"
+  case both = "both"
+}
+
+public struct SavePanelOptions: Decodable, Sendable {
   /// String representation of the file, if applicable.
   public var string: String?
   /// Base64 representation of the file, if applicable.
@@ -629,10 +766,29 @@ public struct SavePanelOptions: Decodable {
   }
 }
 
-public struct CreateFileOptions: Decodable {
+public struct PrintPanelOptions: Decodable, Sendable {
+  /// Base64 representation of the content to print. For 'pdf', this is PDF data.
+  public var data: String
+  /// Job title shown in the print panel and print queue.
+  public var title: String?
+  /// Content type to print. Currently only PDF is supported.
+  private var type: String = "pdf"
+
+  public init(data: String, title: String?) {
+    self.data = data
+    self.title = title
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: BridgeFieldKey.self)
+    data = try container.value("data")
+    title = try container.value("title")
+    type = try container.value("type")
+  }
+}
+
+public struct CreateFileOptions: Decodable, Sendable {
   /// File path.
-  ///
-  /// It must be one that the app can access. See the [wiki](https://github.com/MarkEdit-app/MarkEdit/wiki/Customization#grant-folder-access) for more details.
   public var path: String
   /// If set to true, a directory will be created instead.
   public var isDirectory: Bool?
@@ -661,7 +817,7 @@ public struct CreateFileOptions: Decodable {
   }
 }
 
-public struct MoveFileOptions: Decodable {
+public struct MoveFileOptions: Decodable, Sendable {
   /// Source file path.
   public var source: String
   /// Destination file path.

@@ -10,7 +10,7 @@ import WebKit
 import MarkEditCore
 
 extension QuickLookViewController {
-  func textFileURL(of url: URL) -> URL {
+  nonisolated static func textFileURL(of url: URL) -> URL {
     // The text.* file inside a text bundle
     if url.pathExtension.lowercased() == "textbundle", let contents = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) {
       return contents.first {
@@ -23,12 +23,18 @@ extension QuickLookViewController {
     return url
   }
 
+  @concurrent
+  static func readPreview(at url: URL) async throws -> (url: URL, data: Data) {
+    let fileURL = textFileURL(of: url)
+    return (fileURL, try Data(contentsOf: fileURL))
+  }
+
   var userScripts: [WKUserScript] {
     sharedAssets(directory: "Shared/scripts", types: ["js"]).map { url, contents in
       WKUserScript(
         source: EditorUserAsset.script(for: url, contents: contents),
         injectionTime: .atDocumentEnd,
-        forMainFrameOnly: false
+        forMainFrameOnly: true
       )
     }
   }

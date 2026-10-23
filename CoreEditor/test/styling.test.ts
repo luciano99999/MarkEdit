@@ -2,8 +2,11 @@ import { afterEach, describe, expect, jest, test } from '@jest/globals';
 import { gutterExtensions } from '../src/styling/nodes/gutter';
 import { renderWhitespaceBeforeCaret } from '../src/styling/nodes/invisible';
 import { selectedLinesDecoration } from '../src/styling/nodes/selection';
+import { adjustAlpha } from '../src/styling/helper';
 import { InvisiblesBehavior } from '../src/config';
 import { editingState } from '../src/common/store';
+import { classHighlighters } from '../src/styling/markdown';
+import GitHubLight from '../src/styling/themes/github-light';
 import { sleep } from './utils/helpers';
 import * as editor from './utils/editor';
 
@@ -33,12 +36,40 @@ describe('Styling module', () => {
     expect(classNames.has('cm-lineNumbers')).toBeTruthy();
   });
 
+  test('styles GFM table delimiters separately from content', () => {
+    editor.setUp('| Name | Value |\n|:-----|------:|\n| one | two |', [
+      classHighlighters,
+      GitHubLight().extension,
+    ]);
+
+    const marks = [...window.editor.dom.querySelectorAll('.cm-md-tableMark')];
+    expect(marks.map(mark => mark.textContent)).toEqual(['|', '|', '|', '|:-----|------:|', '|', '|', '|']);
+    expect(getComputedStyle(marks[0]).fontWeight).toBe('500');
+  });
+
   test('decorate active line immediately for focus mode', async () => {
     editor.setUp('line 1\nline 2', selectedLinesDecoration);
     await sleep(200);
 
     const selected = document.querySelectorAll('.cm-selectedLineRange');
     expect(selected.length).toBe(1);
+  });
+});
+
+describe('adjustAlpha', () => {
+  test('adds alpha to opaque hex colors', () => {
+    expect(adjustAlpha('#ffffff', 0.4)).toBe('#ffffff66');
+    expect(adjustAlpha('#fff', 0.4)).toBe('#ffffff66');
+  });
+
+  test('multiplies existing alpha', () => {
+    expect(adjustAlpha('#ffffffd9', 0.4)).toBe('#ffffff57');
+    expect(adjustAlpha('#fff8', 0.5)).toBe('#ffffff44');
+  });
+
+  test('mixes non-hex CSS colors with transparency', () => {
+    expect(adjustAlpha('rgb(255, 255, 255)', 0.4)).toBe('color-mix(in srgb, rgb(255, 255, 255) 40%, transparent)');
+    expect(adjustAlpha('var(--text-color)', 0.5)).toBe('color-mix(in srgb, var(--text-color) 50%, transparent)');
   });
 });
 

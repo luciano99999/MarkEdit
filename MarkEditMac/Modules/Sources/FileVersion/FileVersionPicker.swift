@@ -18,8 +18,8 @@ public protocol FileVersionPickerDelegate: AnyObject {
 /**
  A custom file version picker to replace Time Machine due to its performance issues.
  */
+@MainActor
 public final class FileVersionPicker: NSViewController {
-  private let modernStyle: Bool
   private let fileURL: URL
   private let currentText: String
   private let localizable: FileVersionLocalizable
@@ -95,7 +95,6 @@ public final class FileVersionPicker: NSViewController {
   }()
 
   private lazy var navigateButtons = RoundedNavigateButtons(
-    modernStyle: modernStyle,
     leftAction: { [weak self] in
       self?.goBack()
     },
@@ -128,14 +127,12 @@ public final class FileVersionPicker: NSViewController {
   private weak var delegate: FileVersionPickerDelegate?
 
   public init(
-    modernStyle: Bool,
     fileURL: URL,
     currentText: String,
     localVersions: [NSFileVersion],
     localizable: FileVersionLocalizable,
     delegate: FileVersionPickerDelegate
   ) {
-    self.modernStyle = modernStyle
     self.fileURL = fileURL
     self.currentText = currentText
     self.allVersions = localVersions
@@ -218,7 +215,7 @@ private extension FileVersionPicker {
     view.addSubview(bottomDivider)
 
     modeMenuButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-    modeMenuButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    modeMenuButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     modeMenuButton.addItems(withTitles: localizable.modeTitles)
     modeMenuButton.target = self
     modeMenuButton.action = #selector(didChangeMode(_:))
@@ -227,6 +224,7 @@ private extension FileVersionPicker {
 
     versionMenuButton.target = self
     versionMenuButton.action = #selector(didChangeVersion(_:))
+    versionMenuButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     versionMenuButton.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(versionMenuButton)
 
@@ -281,7 +279,7 @@ private extension FileVersionPicker {
       navigateButtons.trailingAnchor.constraint(equalTo: topGuide.trailingAnchor, constant: -Constants.layoutPadding),
       navigateButtons.centerYAnchor.constraint(equalTo: topGuide.centerYAnchor),
       navigateButtons.widthAnchor.constraint(equalToConstant: navigateButtons.frame.width),
-      navigateButtons.heightAnchor.constraint(equalTo: versionMenuButton.heightAnchor, constant: modernStyle ? 0 : -2),
+      navigateButtons.heightAnchor.constraint(equalTo: versionMenuButton.heightAnchor),
 
       modeMenuButton.trailingAnchor.constraint(equalTo: navigateButtons.leadingAnchor, constant: -Constants.layoutPadding),
       modeMenuButton.centerYAnchor.constraint(equalTo: topGuide.centerYAnchor),
@@ -488,7 +486,7 @@ private extension FileVersionPicker {
         self?.scrollView.scrollTextViewUp()
         return nil
       case .kVK_Space:
-        self?.gotoVersion(at: NSApp.shiftKeyIsPressed ? ((self?.allVersions.count ?? 1) - 1) : 0)
+        self?.gotoVersion(at: event.modifierFlags.contains(.shift) ? ((self?.allVersions.count ?? 1) - 1) : 0)
         return nil
       default:
         return event

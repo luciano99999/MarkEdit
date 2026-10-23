@@ -7,6 +7,7 @@
 
 import AppKit
 import AppKitExtensions
+import QuickSearchUI
 import SharedUI
 import WebKit
 import MarkEditKit
@@ -22,19 +23,15 @@ extension EditorViewController {
     let wrapper = NSView(frame: CGRect(x: 0, y: 0, width: 720, height: 480))
     self.view = wrapper
 
-    if AppDesign.modernTitleBar {
-      wrapper.addSubview(modernBackgroundView)
-    }
-
+    wrapper.addSubview(modernBackgroundView)
     wrapper.addSubview(findPanel)
     wrapper.addSubview(replacePanel)
     wrapper.addSubview(webView)
     wrapper.addSubview(statusView)
 
-    if AppDesign.modernTitleBar {
-      wrapper.addSubview(modernEffectView)
-      wrapper.addSubview(modernDividerView)
-    }
+    // View order matters
+    wrapper.addSubview(modernEffectView)
+    wrapper.addSubview(modernDividerView)
 
     // The divider must be on very top
     panelDivider.alphaValue = AppDesign.dividerAlpha
@@ -44,27 +41,26 @@ extension EditorViewController {
     layoutWebView()
     layoutStatusView()
 
-    if AppDesign.modernTitleBar {
-      modernBackgroundView.translatesAutoresizingMaskIntoConstraints = false
-      NSLayoutConstraint.activate([
-        modernBackgroundView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-        modernBackgroundView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-        modernBackgroundView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-        modernBackgroundView.topAnchor.constraint(equalTo: modernEffectView.bottomAnchor),
-      ])
+    // Initialize the customized modern titlebar
+    modernBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      modernBackgroundView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+      modernBackgroundView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+      modernBackgroundView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+      modernBackgroundView.topAnchor.constraint(equalTo: modernEffectView.bottomAnchor),
+    ])
 
-      modernEffectView.material = .titlebar
-      modernEffectView.translatesAutoresizingMaskIntoConstraints = false
-      NSLayoutConstraint.activate([
-        modernEffectView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-        modernEffectView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-        modernEffectView.topAnchor.constraint(equalTo: wrapper.topAnchor),
-        modernEffectHeight,
-      ])
+    modernEffectView.material = .titlebar
+    modernEffectView.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      modernEffectView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+      modernEffectView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+      modernEffectView.topAnchor.constraint(equalTo: wrapper.topAnchor),
+      modernEffectHeight,
+    ])
 
-      // To avoid duplicate dividers
-      modernDividerView.alphaValue = 0
-    }
+    // To avoid duplicate dividers
+    modernDividerView.alphaValue = 0
 
     // Initially hide panels to prevent being found by VoiceOver
     findPanel.isHidden = true
@@ -126,37 +122,62 @@ extension EditorViewController {
     view.window?.backgroundColor = backgroundColor
     titlebarView?.layerBackgroundColor = backgroundColor
 
-    let prefersTintedToolbar = theme.prefersTintedToolbar || backgroundColor.isTintedColor
+    let prefersTintedToolbar = theme.prefersTintedColors || backgroundColor.isTintedColor
     (view.window as? EditorWindow)?.prefersTintedToolbar = prefersTintedToolbar
 
-    if AppDesign.modernTitleBar {
-      let isMainWindow = view.window?.isMainWindow ?? false
-      let isFullscreen = view.window?.styleMask.contains(.fullScreen) ?? false
-      let reduceTransparency = !isMainWindow || AppDesign.reduceTransparency || isFullscreen
-      let baseColor = backgroundColor.withAlphaComponent(reduceTransparency ? 1.0 : 0.01)
+    let isMainWindow = view.window?.isMainWindow ?? false
+    let isFullscreen = view.window?.styleMask.contains(.fullScreen) ?? false
+    let reduceTransparency = !isMainWindow || AppDesign.reduceTransparency || isFullscreen
+    let baseColor = backgroundColor.withAlphaComponent(reduceTransparency ? 1.0 : 0.01)
 
-      view.window?.backgroundColor = baseColor
-      titlebarView?.layerBackgroundColor = baseColor
+    view.window?.backgroundColor = baseColor
+    titlebarView?.layerBackgroundColor = baseColor
 
-      modernBackgroundView.layerBackgroundColor = backgroundColor
-      modernEffectView.isHidden = reduceTransparency
+    modernBackgroundView.layerBackgroundColor = backgroundColor
+    modernEffectView.isHidden = reduceTransparency
 
-      // The effect view is hidden when transparency is reduced, so the material only matters otherwise
-      let material = AppRuntimeConfig.toolbarTranslucency.material
-      modernEffectView.backdropBlur = material.backdropBlur
+    // The effect view is hidden when transparency is reduced, so the material only matters otherwise
+    let material = AppRuntimeConfig.toolbarTranslucency.material
+    modernEffectView.backdropBlur = material.backdropBlur
 
-      let alphaValue = prefersTintedToolbar ? material.tintedOpacity : material.plainOpacity
-      modernEffectView.tintColor = backgroundColor.withAlphaComponent(alphaValue).resolvedColor()
-    }
+    let alphaValue = prefersTintedToolbar ? material.tintedOpacity : material.plainOpacity
+    modernEffectView.tintColor = backgroundColor.withAlphaComponent(alphaValue).resolvedColor()
 
     statusView.setBackgroundColor(backgroundColor)
     findPanel.setBackgroundColor(backgroundColor)
     replacePanel.setBackgroundColor(backgroundColor)
   }
 
-  @available(macOS 15.1, *)
+  func updateVisibleTransientTintColors(for theme: AppTheme) {
+    let tintColor = transientTintColor(for: theme)
+    completionContext.tintColor = tintColor
+
+    for case let window as QuickSearchWindow in NSApp.windows {
+      guard window !== NSApp.appDelegate?.quickSearchController?.window else {
+        continue
+      }
+
+      window.appearance = theme.resolvedAppearance
+      window.tintColor = tintColor
+    }
+
+    NSApp.appDelegate?.updateQuickSearchAppearance()
+    presentedViewControllers?.forEach {
+      $0.view.layerBackgroundColor = tintColor
+    }
+  }
+
+  func transientTintColor(for theme: AppTheme) -> NSColor? {
+    let backgroundColor = webBackgroundColor ?? theme.windowBackground
+    guard theme.prefersTintedColors || backgroundColor.isTintedColor else {
+      return nil
+    }
+
+    return backgroundColor.withAlphaComponent(0.5).resolvedColor()
+  }
+
   func updateWritingTools(isActive: Bool) {
-    let performUpdate = {
+    let performUpdate: @MainActor @Sendable () -> Void = {
       // Work around undo stack and selection range issues
       self.bridge.writingTools.setActive(
         isActive: isActive,
@@ -194,13 +215,8 @@ extension EditorViewController {
       findPanel.findButtons.frame.height
     )
 
-    if AppDesign.modernTitleBar {
-      modernEffectHeight.constant = view.safeAreaInsets.top + panelDivider.frame.height
-      modernDividerView.update(animated).alphaValue = findPanel.mode == .hidden ? 0 : AppDesign.dividerAlpha
-    } else {
-      // To avoid duplicate dividers on legacy titlebar
-      panelDivider.isHidden = findPanel.mode == .hidden
-    }
+    modernEffectHeight.constant = view.safeAreaInsets.top + panelDivider.frame.height
+    modernDividerView.update(animated).alphaValue = findPanel.mode == .hidden ? 0 : AppDesign.dividerAlpha
 
     // The position of this divider should be fixed
     modernDividerView.frame = CGRect(
@@ -227,14 +243,8 @@ extension EditorViewController {
   }
 
   func layoutStatusView() {
-    let margin: Double = {
-      if AppDesign.modernStyle {
-        // To fit better for the huge corner radius
-        return 16
-      }
-
-      return 6
-    }()
+    // To fit better for the huge corner radius
+    let margin: Double = 16
 
     statusView.frame = CGRect(
       x: view.bounds.width - statusView.frame.width - margin,
@@ -424,12 +434,45 @@ extension EditorViewController {
     resetUserDefinedMenuItems()
   }
 
-  func showContextMenu(items: [WebMenuItem], location: CGPoint) {
+  func showContextMenu(items: [WebMenuItem], location: CGPoint, highlightedIndex: Int?) {
     let menu = createMenu(items: items, handler: bridge.api.handleContextMenuAction)
     menu.identifier = EditorWebView.userDefinedContextMenuID
 
-    NSCursor.arrow.push()
-    menu.popUp(positioning: nil, at: location, in: webView)
+    let highlightedItem: NSMenuItem? = {
+      guard let highlightedIndex, menu.items.indices.contains(highlightedIndex) else {
+        return nil
+      }
+
+      menu.update()
+      let item = menu.items[highlightedIndex]
+      return item.isEnabled && !item.isSeparatorItem ? item : nil
+    }()
+
+    let popUp = { (item: NSMenuItem?) in
+      NSCursor.arrow.push()
+      menu.popUp(positioning: item, at: location, in: self.webView)
+    }
+
+    guard let item = highlightedItem as? UserDefinedMenuItem,
+          let stateGetterID = item.stateGetterID else {
+      return popUp(highlightedItem)
+    }
+
+    Task {
+      var itemToHighlight: NSMenuItem?
+      do {
+        let state = try await bridge.api.getMenuItemState(id: stateGetterID)
+        itemToHighlight = state.isEnabled == false ? nil : item
+      } catch {
+        Logger.log(.error, "Failed to retrieve context menu item state: \(error)")
+      }
+
+      guard view.window != nil else {
+        return Logger.log(.debug, "Context menu dismissed because its editor is no longer in a window")
+      }
+
+      popUp(itemToHighlight)
+    }
   }
 
   func showAlert(title: String?, message: String?, buttons: [String]?) async -> NSApplication.ModalResponse {
@@ -445,19 +488,12 @@ extension EditorViewController {
   }
 
   func showTextBox(title: String?, placeholder: String?, defaultValue: String?) async -> String? {
-    class TextField: NSTextField {
-      // The main menu binds "Select All" to `selectWholeDocument(_:)`
-      @IBAction func selectWholeDocument(_ sender: Any?) {
-        currentEditor()?.selectAll(nil)
-      }
-    }
-
     let alert = NSAlert()
     alert.messageText = title ?? ""
     alert.addButton(withTitle: Localized.General.done)
     alert.addButton(withTitle: Localized.General.cancel)
 
-    let textField = TextField.alertCapableTextField
+    let textField = NSTextField.alertCapableTextField
     textField.placeholderString = placeholder
     textField.stringValue = defaultValue ?? ""
     alert.accessoryView = textField
@@ -553,9 +589,7 @@ private extension EditorViewController {
       return
     }
 
-    if AppDesign.modernStyle {
-      updateWindowColors(.current)
-    }
+    updateWindowColors(.current)
 
     if AppRuntimeConfig.nativeSearchQuerySync {
       updateNativeSearchQuery()
@@ -567,9 +601,7 @@ private extension EditorViewController {
       return
     }
 
-    if AppDesign.modernStyle {
-      updateWindowColors(.current)
-    }
+    updateWindowColors(.current)
   }
 
   @objc func popoverDidShow(_ notification: Notification) {
@@ -592,11 +624,13 @@ private extension EditorViewController {
       return .separator()
     } else if let children = spec.children {
       let item = UserDefinedMenuItem(title: spec.title ?? "")
+      item.ensureTitleVisibility()
       item.image = createMenuIcon(spec: spec)
       item.submenu = createMenu(items: children, handler: handler)
       return item
     } else if let title = spec.title {
       let item = UserDefinedMenuItem(title: title)
+      item.ensureTitleVisibility()
       if let actionID = spec.actionID {
         item.addAction { handler(actionID, nil) }
       }

@@ -1,6 +1,66 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "bkm-Mn-001.title": {
+      "comment": "Class = \"NSMenu\"; title = \"Bookmarks\"; ObjectID = \"bkm-Mn-001\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Bookmarks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "书签"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書籤"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segnalibri"
+          }
+        }
+      }
+    },
+    "OQ1-op-enQ.title": {
+      "comment": "Class = \"NSMenuItem\"; title = \"Quick Search…\"; ObjectID = \"OQ1-op-enQ\";",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Quick Search…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜索…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速搜尋…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricerca rapida…"
+          }
+        }
+      }
+    },
     "0C5-FE-fvI.title": {
       "comment": "Class = \"NSMenuItem\"; title = \"Float on Top\"; ObjectID = \"0C5-FE-fvI\";",
       "extractionState": "extracted_with_value",
@@ -2399,31 +2459,31 @@
       }
     },
     "hw9-Pl-u8s.title": {
-      "comment": "Class = \"NSMenuItem\"; title = \"Grant Folder Access\"; ObjectID = \"hw9-Pl-u8s\";",
+      "comment": "Class = \"NSMenuItem\"; title = \"Add Bookmarks…\"; ObjectID = \"hw9-Pl-u8s\";",
       "extractionState": "extracted_with_value",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Grant Folder Access"
+            "value": "Add Bookmarks…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予目录权限"
+            "value": "添加书签…"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予目錄許可權"
+            "value": "加入書籤…"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Concedi accesso alla cartella"
+            "value": "Aggiungi segnalibri…"
           }
         }
       }
@@ -2699,31 +2759,31 @@
       }
     },
     "j7w-ok-RLg.title": {
-      "comment": "Class = \"NSMenuItem\"; title = \"Grant Folder Access\"; ObjectID = \"j7w-ok-RLg\";",
+      "comment": "Class = \"NSMenuItem\"; title = \"Bookmarks\"; ObjectID = \"j7w-ok-RLg\";",
       "extractionState": "extracted_with_value",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Grant Folder Access"
+            "value": "Bookmarks"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予目录权限"
+            "value": "书签"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "授予目錄許可權"
+            "value": "書籤"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Concedi accesso alla cartella"
+            "value": "Segnalibri"
           }
         }
       }

@@ -1,9 +1,11 @@
 import { KeyBinding } from '@codemirror/view';
 import { EditorSelection } from '@codemirror/state';
-import { HeadingInfo } from './types';
+import { DocumentOutline, HeadingInfo } from './types';
 import { getSyntaxTree } from '../lezer';
 import { scrollToSelection } from '../selection';
 import { saveGoBackSelection } from '../selection/navigate';
+import { playSystemBeep } from '../../common/utils';
+import { getDocumentRevision } from '../../common/documentRevision';
 import selectWithRanges from '../selection/selectWithRanges';
 
 // Ctrl-Mod-Arrow to navigate sections, Alt-Mod-Arrow conflicts with adding carets
@@ -26,7 +28,7 @@ export const tocKeymap: KeyBinding[] = [
   },
 ];
 
-export function getTableOfContents() {
+export function getTableOfContents(truncateTitles = true) {
   const editor = window.editor;
   const state = editor.state;
   const results: HeadingInfo[] = [];
@@ -55,11 +57,12 @@ export function getTableOfContents() {
       })();
 
       results.push({
-        title: title.length > 64 ? title.substring(0, 64) + '...' : title,
+        title: truncateTitles && title.length > 64 ? title.substring(0, 64) + '...' : title,
         level: parseInt(match[1]) as CodeGen_Int,
         from: node.from as CodeGen_Int,
         to: node.to as CodeGen_Int,
         selected: false,
+        lineNumber: state.doc.lineAt(node.from).number as CodeGen_Int,
       });
     },
   });
@@ -76,6 +79,16 @@ export function getTableOfContents() {
   return results;
 }
 
+export function getDocumentOutline(knownRevision?: string): DocumentOutline {
+  const state = window.editor.state;
+  const revision = getDocumentRevision(state);
+  return {
+    revision,
+    text: revision === knownRevision ? undefined : state.sliceDoc(),
+    headings: getTableOfContents(false),
+  };
+}
+
 export function getLinkAnchor(title: string) {
   return title
     .normalize('NFKD')
@@ -87,14 +100,24 @@ export function getLinkAnchor(title: string) {
 
 export function selectPreviousSection() {
   const toc = getTableOfContents();
-  const index = Math.max(0, toc.findIndex(info => info.selected) - 1);
-  gotoHeader(toc[index]);
+  const current = toc.findIndex(info => info.selected);
+  const selection = window.editor.state.selection.main.head;
+  const target = selection > (toc[current]?.to ?? selection) ? current : current - 1;
+  if (target < 0) {
+    return playSystemBeep('Invalid Heading');
+  }
+
+  gotoHeader(toc[target]);
 }
 
 export function selectNextSection() {
   const toc = getTableOfContents();
-  const index = Math.min(toc.length - 1, toc.findIndex(info => info.selected) + 1);
-  gotoHeader(toc[index]);
+  const current = toc.findIndex(info => info.selected);
+  if (current === toc.length - 1) {
+    return playSystemBeep('Invalid Heading');
+  }
+
+  gotoHeader(toc[current + 1]);
 }
 
 export function gotoHeader(headingInfo: HeadingInfo) {
@@ -103,4 +126,4 @@ export function gotoHeader(headingInfo: HeadingInfo) {
   scrollToSelection(window.config.typewriterMode ? 'center' : 'start');
 }
 
-export type { HeadingInfo };
+export type { DocumentOutline, HeadingInfo };

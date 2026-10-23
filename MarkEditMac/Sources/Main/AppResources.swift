@@ -22,14 +22,21 @@ enum Localized {
     static let safeModeAppName = String(localized: "MarkEdit (Safe Mode)", comment: "App menu title when running without customizations")
     static let done = String(localized: "Done", comment: "Button title, confirm an action")
     static let cancel = String(localized: "Cancel", comment: "Button title, cancel an action")
+    static let learnMore = String(localized: "Learn More…", comment: "Button title, open related documentation")
     static let delete = String(localized: "Delete", comment: "Button title, confirm the deletion")
     static let previous = String(localized: "Previous", comment: "Button title, move to the previous item")
     static let next = String(localized: "Next", comment: "Button title, move to the next item")
     static let all = String(localized: "All", comment: "Button title, perform actions to all items")
     static let selected = String(localized: "Selected", comment: "General title that indicates something is selected")
-    static let grantAccess = String(localized: "Grant Access", comment: "Open panel prompt, used for granting access for the selected folder")
     static let insertTab = String(localized: "Insert Tab", comment: "Insert a tab into the current editor")
     static let insertLineBreak = String(localized: "Insert Line Break", comment: "Insert a line break into the current editor")
+  }
+
+  enum SecretStorage {
+    static let title = String(localized: "Allow “%@” to Read a Saved Credential?", comment: "Secret access confirmation title, with the extension identity")
+    static let message = String(localized: "Credential: %@\nRequested by: %@\n\nThe extension may retain and reuse the credential after this read.", comment: "Secret access confirmation message, with the secret key followed by the requesting script's breadcrumb path")
+    static let allowThisRead = String(localized: "Allow This Read", comment: "Button to approve one script read from Keychain")
+    static let dontAllowRead = String(localized: "Don’t Allow Read", comment: "Button to deny a script read from Keychain")
   }
 
   enum Editor {
@@ -42,10 +49,21 @@ enum Localized {
     static let unfoldLine = String(localized: "Unfold Line", comment: "Phrase used in CodeMirror to unfold a line")
     static let defaultLinkTitle = String(localized: "title", comment: "Default title used for link insertion")
     static let previewButtonTitle = String(localized: "Preview", comment: "Button title for code preview")
+    static let closeButtonTitle = String(localized: "Close", comment: "Button title to close a preview")
     static let cmdClickToFollow = String(localized: "⌘-click to follow", comment: "Tooltip for links")
     static let cmdClickToToggleTodo = String(localized: "⌘-click to toggle todo", comment: "Tooltip for tasks")
     static let tableColumnName = String(localized: "Column", comment: "Column name for table creation")
     static let tableItemName = String(localized: "Item", comment: "Item name for table creation")
+  }
+
+  enum Bookmarks {
+    static let addBookmarksPrompt = String(localized: "Add Bookmarks", comment: "Menu and button title to bookmark files and folders")
+    static let addBookmarks = addBookmarksPrompt + "…" // Used as the menu item title
+    static let accessMessage = String(localized: "Allow MarkEdit to access the selected files and folders.", comment: "Open panel message explaining bookmark access")
+    static let revealInFinder = String(localized: "Reveal in Finder", comment: "Menu item to reveal a bookmarked file or folder")
+    static let revokeBookmark = String(localized: "Revoke Bookmark", comment: "Menu item to remove a bookmark and release its access")
+    static let revokeAll = String(localized: "Revoke All", comment: "Menu item to remove all bookmarks and release their access")
+    static let unavailable = String(localized: "Unavailable Bookmark %d", comment: "Title for an unresolvable bookmark, numbered by its position")
   }
 
   enum Toolbar {
@@ -128,7 +146,10 @@ enum Localized {
     static let openFontPanel = String(localized: "Open Font Panel…", comment: "Menu item for selecting custom fonts")
     static let lightTheme = String(localized: "Light Theme:", comment: "Light theme for the editor")
     static let darkTheme = String(localized: "Dark Theme:", comment: "Dark theme for the editor")
-    static let getCustomThemes = String(localized: "Get Custom Themes…", comment: "Get custom themes from the GitHub")
+    static let lightThemes = String(localized: "Light Themes", comment: "Light theme section title")
+    static let darkThemes = String(localized: "Dark Themes", comment: "Dark theme section title")
+    static let themeExtensions = String(localized: "Enabled Extensions", comment: "Enabled theme extensions section title")
+    static let manageThemes = String(localized: "Manage…", comment: "Open installed theme extensions")
     static let displayOptions = String(localized: "Show:", comment: "Label for display options")
     static let lineNumbers = String(localized: "Line numbers", comment: "Option to show line numbers")
     static let activeLineIndicator = String(localized: "Active line indicator", comment: "Option to show active line indicator")
@@ -272,13 +293,13 @@ enum Icons {
   static let gearshape = "gearshape"
   static let italic = "italic"
 
-  static let interfaceWindow = if #available(macOS 27.0, *) {
+  static let interfaceWindow = if #available(anyAppleOS 27.0, *) {
     "interface.window"
   } else {
     "macwindow"
   }
 
-  static let interfaceWindowOnRectangle = if #available(macOS 27.0, *) {
+  static let interfaceWindowOnRectangle = if #available(anyAppleOS 27.0, *) {
     "interface.window.on.rectangle"
   } else {
     "macwindow.on.rectangle"
@@ -291,7 +312,7 @@ enum Icons {
   static let listBullet = "list.bullet"
   static let listBulletRectangle = "list.bullet.rectangle"
 
-  static let numberSign = if #available(macOS 27.0, *) {
+  static let numberSign = if #available(anyAppleOS 27.0, *) {
     "number.sign"
   } else {
     "number"
@@ -324,6 +345,7 @@ extension EditorLocalizable {
       foldLine: Localized.Editor.foldLine,
       unfoldLine: Localized.Editor.unfoldLine,
       previewButtonTitle: Localized.Editor.previewButtonTitle,
+      closeButtonTitle: Localized.Editor.closeButtonTitle,
       cmdClickToFollow: Localized.Editor.cmdClickToFollow,
       cmdClickToToggleTodo: Localized.Editor.cmdClickToToggleTodo
     )

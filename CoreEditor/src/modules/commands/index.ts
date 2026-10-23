@@ -1,5 +1,6 @@
 import { EditorView, KeyBinding } from '@codemirror/view';
-import { EditorSelection, findClusterBreak } from '@codemirror/state';
+import { EditorSelection, EditorState, findClusterBreak } from '@codemirror/state';
+import { focusedEditor } from '../../common/utils';
 import {
   copyLineDown,
   copyLineUp,
@@ -124,6 +125,10 @@ export function insertMathBlock() {
 }
 
 export function clearSyntaxSelections() {
+  if (storage.editor !== window.editor) {
+    return;
+  }
+
   // We can't reliably distinguish user selections from syntax-aware selection changes
   if (Date.now() - storage.historyChangedTime < 150) {
     return;
@@ -132,60 +137,30 @@ export function clearSyntaxSelections() {
   storage.selectionHistory = [];
 }
 
-export function deleteEmojiBackward(editor: EditorView) {
-  const state = editor.state;
-  if (state.readOnly) {
-    return false;
-  }
-
-  const starts = state.selection.ranges.map(range => {
-    if (!range.empty) {
-      return undefined;
-    }
-
-    const line = state.doc.lineAt(range.from);
-    const pos = range.from - line.from;
-    const from = findClusterBreak(line.text, pos, false);
-    return isEmojiSplitByBackwardDeletion(line.text.slice(from, pos)) ? from + line.from : undefined;
-  });
-
-  if (starts.some(from => from === undefined)) {
-    return false;
-  }
-
-  let index = 0;
-  const updates = state.changeByRange(range => {
-    const from = starts[index++] as number;
-    return {
-      changes: { from, to: range.from },
-      range: EditorSelection.cursor(from),
-    };
-  });
-
-  editor.dispatch(state.update(updates, {
-    scrollIntoView: true,
-    userEvent: 'delete.backward',
-  }));
-
-  return true;
-}
-
 export const emojiDeletionKeymap: KeyBinding[] = [
   { key: 'Backspace', run: deleteEmojiBackward, shift: deleteEmojiBackward },
 ];
 
 /**
  * Wrapper to a series of commands in CodeMirror,
- * we need this because we want to show them in the application.
+ * targeting the focused editor when invoked from the application.
  */
 export function performEditCommand(command: EditCommand) {
-  const editor = window.editor;
+  const editor = focusedEditor();
+  if (editor === null) {
+    return;
+  }
+
   switch (command) {
     case EditCommand.indentLess: indentLess(editor); break;
     case EditCommand.indentMore: indentMore(editor); break;
     case EditCommand.expandSelection: expandSelection(editor); break;
     case EditCommand.shrinkSelection: shrinkSelection(editor); break;
-    case EditCommand.selectLine: selectLine(editor); break;
+    case EditCommand.selectLine: {
+      prepareSelectionHistory(editor);
+      selectLine(editor);
+      break;
+    }
     case EditCommand.moveLineUp: moveLineUp(editor); break;
     case EditCommand.moveLineDown: moveLineDown(editor); break;
     case EditCommand.copyLineUp: copyLineUp(editor); break;
@@ -241,6 +216,46 @@ export const customizedCommandsKeymap: KeyBinding[] = [
 export { formatContent };
 export type { EditCommand };
 
+function deleteEmojiBackward(editor: EditorView) {
+  const state = editor.state;
+  if (state.readOnly) {
+    return false;
+  }
+
+  const starts = state.selection.ranges.map(range => {
+    if (!range.empty) {
+      return undefined;
+    }
+
+    const line = state.doc.lineAt(range.from);
+    const pos = range.from - line.from;
+    const precedingText = line.text.slice(0, pos);
+    const subdivisionFlagFrom = precedingText.search(/\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F}$/u);
+    const from = subdivisionFlagFrom < 0 ? findClusterBreak(line.text, pos, false, true) : subdivisionFlagFrom;
+    return isEmojiSplitByBackwardDeletion(line.text.slice(from, pos)) ? from + line.from : undefined;
+  });
+
+  if (starts.some(from => from === undefined)) {
+    return false;
+  }
+
+  let index = 0;
+  const updates = state.changeByRange(range => {
+    const from = starts[index++] as number;
+    return {
+      changes: { from, to: range.from },
+      range: EditorSelection.cursor(from),
+    };
+  });
+
+  editor.dispatch(state.update(updates, {
+    scrollIntoView: true,
+    userEvent: 'delete.backward',
+  }));
+
+  return true;
+}
+
 /**
  * Scroll one page, leaving the selection untouched.
  */
@@ -252,19 +267,27 @@ function scrollByPage(editor: EditorView, forward: boolean) {
 }
 
 function expandSelection(editor: EditorView) {
+  prepareSelectionHistory(editor);
   storage.historyChangedTime = Date.now();
+
   const selection = editor.state.selection;
   if (selectParentSyntax(editor)) {
     storage.selectionHistory.push(selection);
   }
+
+  storage.state = editor.state;
 }
 
 function shrinkSelection(editor: EditorView) {
+  prepareSelectionHistory(editor);
   storage.historyChangedTime = Date.now();
+
   const selection = storage.selectionHistory.pop();
   if (selection !== undefined) {
     editor.dispatch({ selection });
   }
+
+  storage.state = editor.state;
 }
 
 /**
@@ -304,9 +327,20 @@ function isEmojiSplitByBackwardDeletion(cluster: string) {
     || /^\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F}$/u.test(cluster);
 }
 
+function prepareSelectionHistory(editor: EditorView) {
+  if (storage.editor !== editor || storage.state?.doc !== editor.state.doc
+    || !storage.state.selection.eq(editor.state.selection)) {
+    storage.selectionHistory = [];
+  }
+
+  storage.editor = editor;
+}
+
 const storage: {
   selectionHistory: EditorSelection[];
   historyChangedTime: number;
+  editor?: EditorView;
+  state?: EditorState;
 } = {
   selectionHistory: [],
   historyChangedTime: 0,

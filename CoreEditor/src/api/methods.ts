@@ -2,8 +2,9 @@ import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { LanguageDescription, LanguageSupport } from '@codemirror/language';
 import { MarkdownConfig } from '@lezer/markdown';
-import { EditorConfigChange, RuntimeInfo } from 'markedit-api';
+import { EditorConfigChange, MarkEdit, RuntimeInfo } from 'markedit-api';
 import { markdownConfigurations } from '../extensions';
+import { playSystemBeep as beep } from '../common/utils';
 
 type EditorReadyListener = (editor: EditorView) => void;
 type EditorConfigChangeListener = (...change: EditorConfigChange) => void;
@@ -31,12 +32,20 @@ export function notifyAppReady() {
   storage.appReadyListeners = [];
 }
 
+export async function openDocument(path: string, options?: Parameters<MarkEdit['openDocument']>[1]): Promise<boolean> {
+  return window.nativeModules.api.openDocument({ path, target: options?.target });
+}
+
 export async function saveDocument(): Promise<boolean> {
   return window.nativeModules.api.saveDocument();
 }
 
 export async function closeDocument(): Promise<boolean> {
   return window.nativeModules.api.closeDocument();
+}
+
+export async function recentDocumentPaths(): Promise<string[]> {
+  return window.nativeModules.api.recentDocumentPaths();
 }
 
 export function runtimeInfo(): RuntimeInfo {
@@ -54,6 +63,10 @@ export function terminateApp(): void {
 
 export function relaunchApp(): void {
   window.nativeModules.api.relaunchApp();
+}
+
+export function playSystemBeep(): void {
+  beep();
 }
 
 export function addExtension(extension: Extension) {
