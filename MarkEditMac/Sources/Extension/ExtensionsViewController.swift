@@ -305,6 +305,7 @@ extension ExtensionsViewController {
     }
   }
 
+#if canImport(FoundationModels, _version: 2)
   /// Pull refresh keeps the list visible and uses only the native refresh indicator.
   @available(macOS 27.0, *)
   @objc private func pullToRefresh(_ sender: NSRefreshController) {
@@ -331,6 +332,7 @@ extension ExtensionsViewController {
       applyModelChanges()
     }
   }
+#endif
 
   func updateAllAnimated() {
     runWithProgressOverlay(message: Localized.Extension.updating) { [weak self] in
@@ -425,12 +427,14 @@ private extension ExtensionsViewController {
     scrollView.backgroundColor = .windowBackgroundColor
     view.addSubview(scrollView)
 
+  #if canImport(FoundationModels, _version: 2)
     if #available(macOS 27.0, *) {
       let refreshController = NSRefreshController()
       refreshController.target = self
       refreshController.action = #selector(pullToRefresh(_:))
       scrollView.refreshController = refreshController
     }
+  #endif
 
     let contentView = scrollView.contentView
     contentView.postsBoundsChangedNotifications = true

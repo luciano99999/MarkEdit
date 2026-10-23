@@ -233,8 +233,12 @@ private extension ExtensionsWindowController {
     group.label = Localized.Extension.windowTitle
 
     // [macOS 27] Use "tabs" role, the default style has vertical dividers
-    if #available(macOS 27.0, *) {
+    if #available(macOS 27.0, *), group.responds(to: sel_getUid("setRole:")) {
+    #if canImport(FoundationModels, _version: 2)
       group.role = .tabs
+    #else
+      group.setValue(1, forKey: "role") // .tabs
+    #endif
     }
 
     modeControl = group

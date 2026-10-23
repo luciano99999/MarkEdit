@@ -72,7 +72,13 @@ public extension NSMenuItem {
       return
     }
 
-    preferredImageVisibility = .visible
+    let selector = sel_getUid("setPreferredImageVisibility:")
+    if responds(to: selector) {
+      unsafeBitCast(
+        method(for: selector),
+        to: (@convention(c) (NSMenuItem, Selector, Int) -> Void).self
+      )(self, selector, 1) // .visible
+    }
   }
 }
 

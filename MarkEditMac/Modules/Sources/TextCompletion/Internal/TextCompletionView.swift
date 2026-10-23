@@ -119,22 +119,24 @@ struct TextCompletionView: View {
 
 private extension TextCompletionView {
   var selectionDragGesture: DragGesture {
+  #if canImport(FoundationModels, _version: 2)
     if #available(macOS 27.0, *) {
       // Finger drags belong to the scroll view, not row selection
-      DragGesture(minimumDistance: 0, inputKinds: .pointer)
-    } else {
-      DragGesture(minimumDistance: 0)
+      return DragGesture(minimumDistance: 0, inputKinds: .pointer)
     }
+  #endif
+    return DragGesture(minimumDistance: 0)
   }
 
   func completionTapGesture(index: Int) -> (some Gesture)? {
+  #if canImport(FoundationModels, _version: 2)
     if #available(macOS 27.0, *) {
-      SpatialTapGesture(inputKinds: .directTouch).onEnded { _ in
+      return SpatialTapGesture(inputKinds: .directTouch).onEnded { _ in
         state.selectedIndex = index
         commitCompletion()
       }
-    } else {
-      nil
     }
+  #endif
+    return nil as SpatialTapGesture?
   }
 }
